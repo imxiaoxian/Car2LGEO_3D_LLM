@@ -50,6 +50,7 @@ def test_isolated_decisions_use_identical_state_without_mutating_source(tmp_path
         return dict(tool="inspect", arguments_json="{}", reason="Read the frozen assembly")
 
     monkeypatch.setattr(probe.CodexPlanner, "propose", propose)
+    monkeypatch.setenv("CODEX_CLI_PATH", "fixture-codex")
     report = probe.evaluate(agent, attempt, 0, tmp_path / "evaluation")
     assert len(requests) == 2 and "planner_encoding" not in requests[0]
     assert "planner_encoding" in requests[1]
@@ -67,6 +68,7 @@ def test_two_failed_requests_cannot_count_as_matching_outputs(tmp_path, monkeypa
         raise TimeoutError("Fixture deadline")
 
     monkeypatch.setattr(probe.CodexPlanner, "propose", fail)
+    monkeypatch.setenv("CODEX_CLI_PATH", "fixture-codex")
     report = probe.evaluate(agent, attempt, 0, tmp_path / "evaluation")
     assert report["model_requests"] == 2
     assert not report["same_action"] and not report["same_resulting_graph"]
