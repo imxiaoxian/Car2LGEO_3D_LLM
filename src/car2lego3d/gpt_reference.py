@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from uuid import uuid4
 
 from dotenv import dotenv_values
 from PIL import Image
@@ -45,9 +46,17 @@ def _generate_once(prompt, directory, vehicle_spec=None, reference_image=None, c
         directory.mkdir(parents=True, exist_ok=True)
         target = directory / "identity-anchor.png"
         with Image.open(anchor) as image:
-            image.save(target, format="PNG")
+            if image.format == "PNG":
+                if anchor != target.resolve():
+                    shutil.copyfile(anchor, target)
+            else:
+                image.save(target, format="PNG")
         state["source_image_path"] = str(target)
     inputs = {"prompt": prompt, "provider": "Car2LEGO ReferenceImageService", "source_sha256": digest(upstream),
+              "worker_sha256": digest(ROOT / "scripts/car2lego_reference_worker.py"),
+              "identity_contract_sha256": digest(Path(__file__).with_name("reference_identity.py")),
+              "content_review_sha256": digest(Path(__file__).with_name("reference_review.py")),
+              "reference_gate_sha256": digest(Path(__file__).with_name("reference_gate.py")),
               "shots": [s.record() for s in reference_plan(state['make'] + ' ' + state['model'])],
               "source_root": str(source)}
     with stage(directory, "image", inputs) as record:
@@ -91,6 +100,7 @@ def _generate_once(prompt, directory, vehicle_spec=None, reference_image=None, c
                    'expected_shots': manifest['expected_shots'],
                    "camera_contract": "labelled single-camera whole-car and module details",
                    "identity_anchor": "reference.png", "brief": manifest["brief"],
+                   "identity_lock": manifest.get("identity_lock"),
                    "synthetic": True, "cross_view_consistency_verified": False})
         with Image.open(output) as image:
             size = list(image.size)
@@ -104,29 +114,57 @@ def _generate_once(prompt, directory, vehicle_spec=None, reference_image=None, c
     return view_manifest
 
 
+def load_corrections(directory, shots):
+    path = directory / 'reference-corrections.json'
+    corrections = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+    previous = directory / 'car2lego/references/manifest.json'
+    if corrections and previous.is_file():
+        manifest = json.loads(previous.read_text(encoding='utf-8'))
+        contracts = {shot['id']: shot for shot in manifest.get('expected_shots', [])}
+        current = {shot.id: json.loads(json.dumps(shot.record())) for shot in shots}
+        obsolete = {name for name in corrections if name in contracts and contracts[name] != current.get(name)}
+        if obsolete:
+            history = directory / 'correction-history' / (digest(path) + '.json')
+            history.parent.mkdir(exist_ok=True)
+            if not history.exists():
+                shutil.copyfile(path, history)
+            corrections = {name: text for name, text in corrections.items() if name not in obsolete}
+            write_json(path, corrections)
+    return corrections
+
+
 def generate(prompt, directory, vehicle_spec=None, reference_image=None, *, review=True, max_reference_repairs=3):
     from .reference_review import review_references, repair_corrections
+    from .reference_gate import assess_reference_gate
     directory = Path(directory).resolve()
     correction_path = directory / 'reference-corrections.json'
-    corrections = json.loads(correction_path.read_text(encoding='utf-8')) if correction_path.is_file() else {}
+    identity = load_spec(vehicle_spec)['model'] if vehicle_spec else prompt
+    corrections = load_corrections(directory, reference_plan(identity))
+    review_root = directory / 'content-review' / ('run-' + uuid4().hex) if review else None
     for attempt in range(max_reference_repairs + 1):
         manifest_path = _generate_once(prompt, directory, vehicle_spec, reference_image, corrections)
         if not review:
             return manifest_path
-        report = review_references(manifest_path, directory / 'content-review' / f'attempt-{attempt + 1}')
+        review_directory = review_root / f'attempt-{attempt + 1}'
+        report = review_references(manifest_path, review_directory)
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-        manifest['content_review'] = dict(file=str((directory / 'content-review' / f'attempt-{attempt + 1}' / 'report.json').relative_to(directory)),
-            sha256=digest(directory / 'content-review' / f'attempt-{attempt + 1}' / 'report.json'), status=report['status'])
+        manifest['content_review'] = dict(file=str((review_directory / 'report.json').relative_to(directory)),
+            sha256=digest(review_directory / 'report.json'), status=report['status'])
         for name, result in report['shots'].items():
             manifest['shots'][name]['consistency'] = result
         manifest['views'] = {name: manifest['shots'][name] for name in manifest['views']}
         manifest['cross_view_consistency_verified'] = report['status'] == 'pass'
+        gate = assess_reference_gate(report['shots'])
+        manifest['reference_gate'] = gate
+        manifest['repair_tasks'] = gate['repair_tasks']
+        write_json(directory / 'reference-gate.json', gate)
+        write_json(directory / 'repair-tasks.json', dict(schema='reference-repairs.v1', tasks=gate['repair_tasks']))
         write_json(manifest_path, manifest)
         image_record = json.loads((directory / 'image.json').read_text(encoding='utf-8'))
         image_record['outputs']['views.json'] = digest(manifest_path)
         image_record['content_review'] = manifest['content_review']
         write_json(directory / 'image.json', image_record)
-        if report['status'] == 'pass':
+        if gate['allowed']:
             return manifest_path
         failed = {name: result for name, result in report['shots'].items() if result['status'] != 'pass'}
         if attempt == max_reference_repairs:

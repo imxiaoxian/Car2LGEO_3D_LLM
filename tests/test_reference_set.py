@@ -3,6 +3,7 @@ from collections import Counter
 import hashlib
 import importlib.util
 import json
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -79,7 +80,7 @@ def test_dependency_cache_and_bounded_concurrency(tmp_path):
     service = Service()
     shots = reference_plan('Countach')
     run(service, tmp_path, shots)
-    assert len(shots) == 29 and service.peak == 5
+    assert len(shots) == 30 and service.peak == 5
     initial = service.calls.copy()
     run(service, tmp_path, shots)
     assert service.calls == initial
@@ -96,6 +97,242 @@ def test_provider_concurrency_limit_cannot_be_exceeded(tmp_path):
         asyncio.run(worker.generate_reference_set(Service(),
             dict(storage_path=str(tmp_path), design_id='car2lego'), write_json,
             reference_plan(), concurrency=6))
+
+
+def test_intermediate_scissor_pose_uses_closed_parent_instead_of_upright_pose():
+    shots = {shot.id: shot for shot in reference_plan('Countach')}
+    hinge = shots['scissor_hinge']
+    assert hinge.parents == ('overview', 'door_left_closed')
+    assert '35 degrees' in hinge.state and 'not upright' in hinge.state
+    assert 'not a measured mechanism limit' in hinge.focus
+    assert 'fully open' in shots['door_left_open'].state
+
+
+def test_open_doors_use_closed_same_side_reference_and_preserve_handedness():
+    shots = {shot.id: shot for shot in reference_plan('Countach')}
+    right = shots['door_right_open']
+    assert right.parents == ('overview', 'door_right_closed', 'right', 'front_right')
+    assert 'nose points image RIGHT' in right.camera
+    assert 'left door closed' in right.state
+    assert 'steering wheel stays on the FAR side' in right.focus
+    assert 'never mirror the cabin' in right.focus
+    left = shots['door_left_open']
+    assert 'door_left_closed' in left.parents
+    assert 'nose points image LEFT' in left.camera
+
+
+def test_baseline_cabin_references_keep_visible_seats_without_hidden_hardware_shots(tmp_path):
+    shots = reference_plan('Countach')
+    by_id = {shot.id: shot for shot in shots}
+    service = Service()
+    run(service, tmp_path, shots)
+    manifest = json.loads((tmp_path / 'car2lego/references/manifest.json').read_text())
+    records = {item['view']: item for item in manifest['images']}
+    assert not {'pedal_footwell', 'seat_mounts'} & records.keys()
+    assert 'passenger_seat' in records
+    assert all(by_id[name].modules == ('interior', 'cabin')
+               for name in ('seats_pedals', 'passenger_seat'))
+    assert 'driver seat cushion' in by_id['seats_pedals'].focus
+    assert 'passenger seat cushion' in by_id['passenger_seat'].focus
+    assert set(by_id['passenger_seat'].parents) == {'overview', 'door_right_open'}
+    assert all('looking REARWARDS' in by_id[name].camera for name in ('seats_pedals', 'passenger_seat'))
+    assert 'knowledge-base IO' in by_id['seats_pedals'].focus
+    assert all(records[parent]['sha256'] == expected
+               for name in ('seats_pedals', 'passenger_seat')
+               for parent, expected in records[name]['parents'].items())
+
+
+def test_non_baseline_plan_preserves_existing_detail_cameras():
+    shots = {shot.id: shot for shot in reference_plan('BMW M4')}
+    assert {'pedal_footwell', 'seat_mounts'} <= shots.keys()
+    assert 'covered attachments remain uncertain' in shots['seat_mounts'].focus
+
+
+def test_identity_finishes_before_dependents_and_invalidates_their_cache(tmp_path):
+    service = Service()
+    completed = []
+    observed = dict(paint="white", interior="cream")
+    original = service.generate
+
+    async def generate(state, only):
+        if only != {"overview"}:
+            assert completed and state["identity_lock"]["observations"] == observed
+        return await original(state, only)
+
+    async def read_identity(anchor, brief):
+        assert anchor.is_file() and service.active == 0
+        completed.append(True)
+        return dict(observations=dict(observed))
+
+    service.generate = generate
+    shots = reference_plan()
+    for paint in ("white", "blue"):
+        observed["paint"] = paint
+        asyncio.run(worker.generate_reference_set(service,
+            dict(storage_path=str(tmp_path), design_id="car2lego"), write_json,
+            shots, attempts=1, identity_reader=read_identity))
+    assert service.calls["overview"] == 1
+    assert all(service.calls[shot.id] == 2 for shot in shots if shot.id != "overview")
+    manifest = json.loads((tmp_path / "car2lego/references/manifest.json").read_text())
+    assert manifest["identity_lock"]["observations"]["paint"] == "blue"
+
+
+def test_identity_audit_changes_reuse_images_but_visible_repairs_invalidate(tmp_path):
+    from copy import deepcopy
+    identity = dict(anchor_sha256='pixels', observations=dict(paint='white'),
+        reference_gate=dict(repair_tasks=[dict(id='audit-id', kind='rim_geometry', modules=['front_wheel'],
+            phase_modules=['body'], expected='five holes', verification='count large holes',
+            status='open', evidence=[])]))
+    service = Service()
+    shots = [Shot('overview', 'anchor', (), parents=()), Shot('left', 'side', (), parents=('overview',))]
+
+    async def read_identity(anchor, brief):
+        return deepcopy(identity)
+
+    def execute():
+        asyncio.run(worker.generate_reference_set(service,
+            dict(storage_path=str(tmp_path), design_id='car2lego'), write_json,
+            shots, attempts=1, identity_reader=read_identity))
+
+    execute()
+    identity.update(prompt_sha256='changed review policy', model='changed reviewer')
+    identity['reference_gate']['repair_tasks'][0].update(
+        id='new-audit-id', phase_modules=['wheels'], status='closed', evidence=['new report'])
+    execute()
+    assert service.calls == {'overview': 1, 'left': 1}
+    identity['reference_gate']['repair_tasks'][0]['expected'] = 'six holes'
+    execute()
+    assert service.calls == {'overview': 1, 'left': 2}
+
+
+def test_failed_parent_is_repaired_before_dependent_dispatch_and_passed_siblings_are_reused(tmp_path):
+    service = Service()
+    shots = [Shot("overview", "anchor", (), parents=()),
+             Shot("side", "side", (), parents=("overview",)),
+             Shot("top", "top", (), parents=("overview",)),
+             Shot("detail", "closeup", (), parents=("side",))]
+    original = service.generate
+
+    async def generate(state, only):
+        if only == {"detail"}:
+            assert service.calls["side"] == 2
+        return await original(state, only)
+
+    service.generate = generate
+
+    async def review(anchor, brief, targets, identity):
+        return dict(shots={name: dict(status="needs_revision" if name == "side" and service.calls[name] == 1 else "pass",
+            correction="Restore cream interior") for name in targets})
+
+    def execute():
+        asyncio.run(worker.generate_reference_set(service, dict(storage_path=str(tmp_path), design_id="car2lego"),
+            write_json, shots, attempts=1, batch_reviewer=review))
+
+    execute()
+    assert service.calls == {"overview": 1, "side": 2, "top": 1, "detail": 1}
+    initial = service.calls.copy()
+    execute()
+    assert service.calls == initial
+    checkpoint = json.loads((tmp_path / "car2lego/reference-batch-corrections.json").read_text())
+    assert "Restore cream interior" in checkpoint["corrections"]["side"]
+
+
+def test_anchor_revision_is_reviewed_before_any_dependent_request(tmp_path):
+    service = Service()
+    shots = [Shot("overview", "anchor", (), parents=()), Shot("side", "side", (), parents=("overview",))]
+    original = service.generate
+
+    async def generate(state, only):
+        if only == {"side"}:
+            assert service.calls["overview"] == 2
+        return await original(state, only)
+
+    async def read(anchor, brief):
+        rejected = service.calls["overview"] == 1
+        return dict(observations=dict(wheels="six" if rejected else "five"), anchor_review=dict(
+            status="needs_revision" if rejected else "pass", correction="Use five large rim openings"))
+
+    service.generate = generate
+    asyncio.run(worker.generate_reference_set(service, dict(storage_path=str(tmp_path), design_id="car2lego"),
+        write_json, shots, attempts=1, identity_reader=read))
+    assert service.calls == {"overview": 2, "side": 1}
+    assert len(list((tmp_path / "car2lego/references/history").glob("overview-*.png"))) == 1
+    manifest = json.loads((tmp_path / "car2lego/references/manifest.json").read_text())
+    assert manifest["identity_lock"]["observations"]["wheels"] == "five"
+
+
+def test_local_rim_debt_does_not_regenerate_anchor_or_block_children(tmp_path):
+    service = Service()
+    shots = [Shot("overview", "anchor", (), parents=()), Shot("side", "side", (), parents=("overview",)),
+        Shot("detail", "closeup", (), parents=("side",))]
+    def row():
+        return dict(status="needs_revision", issues=["Wrong rim hole count"], correction="Use five holes",
+            defects=[dict(issue_index=0, kind="rim_geometry", modules=["wheels"], expected="five holes",
+                verification="inspect final rim geometry")])
+    async def read(anchor, brief):
+        return dict(observations=dict(wheels="six visible holes"), anchor_review=row())
+    async def review(anchor, brief, targets, identity):
+        return dict(shots={name: row() for name in targets})
+    asyncio.run(worker.generate_reference_set(service, dict(storage_path=str(tmp_path), design_id="car2lego"),
+        write_json, shots, attempts=1, identity_reader=read, batch_reviewer=review))
+    assert service.calls == {"overview": 1, "side": 1, "detail": 1}
+    manifest = json.loads((tmp_path / "car2lego/references/manifest.json").read_text())
+    assert manifest["identity_lock"]["anchor_review"]["status"] == "needs_revision"
+    assert manifest["identity_lock"]["observations"]["wheels"] == "six visible holes"
+
+
+def test_batch_review_exhaustion_preserves_siblings_and_never_dispatches_children(tmp_path):
+    service = Service()
+    shots = [Shot("overview", "anchor", (), parents=()),
+             Shot("side", "side", (), parents=("overview",)),
+             Shot("top", "top", (), parents=("overview",)),
+             Shot("detail", "closeup", (), parents=("side",))]
+
+    async def reject(anchor, brief, targets, identity):
+        return dict(shots={name: dict(status="needs_revision" if name == "side" else "pass",
+                                     correction="Restore opaque roof") for name in targets})
+
+    with pytest.raises(ValueError, match="algorithm diagnosis"):
+        asyncio.run(worker.generate_reference_set(service, dict(storage_path=str(tmp_path), design_id="car2lego"),
+            write_json, shots, attempts=1, batch_reviewer=reject, max_batch_repairs=2))
+    assert service.calls == {"overview": 1, "side": 3, "top": 1}
+    dispatch = json.loads((tmp_path / "car2lego/reference-dispatch.json").read_text())
+    assert dispatch["status"] == "failed" and dispatch["failed_views"] == ["side"]
+    assert dispatch["failed_details"]["side"]["exception_type"] == "ReferenceContentError"
+    assert dispatch["failed_details"]["side"]["attempts"] == 3
+    assert (tmp_path / "car2lego/references/top.png").is_file()
+
+
+def test_newly_unblocked_shots_fill_next_batch_after_whole_batch_barrier(tmp_path):
+    shots = [Shot("overview", "anchor", (), parents=()),
+             *(Shot(f"side_{index}", "side", (), parents=("overview",)) for index in range(6)),
+             Shot("detail", "closeup", (), parents=("side_0",))]
+    run(Service(), tmp_path, shots)
+    record = json.loads((tmp_path / "car2lego/reference-dispatch.json").read_text())
+    assert [batch["views"] for batch in record["batches"]] == [
+        ["overview"], [f"side_{index}" for index in range(5)], ["side_5", "detail"]]
+    assert all(batch["status"] == "completed" for batch in record["batches"])
+
+
+def test_failed_review_records_batch_failure_and_preserves_generated_pixels(tmp_path):
+    service = Service()
+    shots = [Shot('overview', 'anchor', (), parents=()),
+             Shot('left', 'side', (), parents=('overview',)),
+             Shot('detail', 'detail', (), parents=('left',))]
+
+    async def invalid_review(*args):
+        raise ValueError('Malformed review IDs')
+
+    with pytest.raises(ValueError, match='Malformed review IDs'):
+        asyncio.run(worker.generate_reference_set(service, dict(storage_path=str(tmp_path), design_id='car2lego'),
+            write_json, shots, attempts=1, batch_reviewer=invalid_review))
+    dispatch = json.loads((tmp_path / 'car2lego/reference-dispatch.json').read_text())
+    assert dispatch['status'] == dispatch['batches'][-1]['status'] == 'failed'
+    assert dispatch['failed_views'] == ['left']
+    assert dispatch['failed_details']['left']['stage'] == 'reference_content_review'
+    assert dispatch['failed_details']['left']['error'] == 'Malformed review IDs'
+    assert service.calls == {'overview': 1, 'left': 1}
+    assert (tmp_path / 'car2lego/references/left.png').is_file()
 
 
 @pytest.mark.parametrize('retry', [False, True])
@@ -180,12 +417,16 @@ def test_completed_siblings_survive_failure(tmp_path):
     assert service.calls['front_left'] == 0
     dispatch = json.loads((tmp_path / 'car2lego/reference-dispatch.json').read_text())
     assert dispatch['status'] == 'failed' and dispatch['failed_views'] == ['left']
+    assert dispatch['failed_details']['left']['error'] == 'test failure'
+    assert dispatch['failed_details']['left']['attempt'] == 1
     assert len(dispatch['batches']) == 2
     assert dispatch['batches'][-1]['status'] == 'failed'
     assert set(dispatch['batches'][-1]['completed_views']) == {'front', 'back', 'right', 'top'}
     service.fail.clear()
     run(service, tmp_path, shots)
     assert service.calls['right'] == 1 and service.calls['left'] == 2
+    dispatch = json.loads((tmp_path / 'car2lego/reference-dispatch.json').read_text())
+    assert dispatch['failed_details'] == {}
 
 
 def test_rich_manifest_rejects_stale_parent_and_keeps_module_details(tmp_path):
@@ -207,3 +448,108 @@ def test_rich_manifest_rejects_stale_parent_and_keeps_module_details(tmp_path):
     write_json(path, manifest)
     with pytest.raises(ValueError, match='Stale parent'):
         load_references(path)
+
+
+def test_related_right_side_images_precede_the_left_front_identity_anchor(tmp_path, monkeypatch):
+    calls = []
+
+    async def edit(**request):
+        calls.append(dict(files=[Path(file.name).name for file in request['image']], prompt=request['prompt']))
+        assert all(not file.closed for file in request['image'])
+        return 'result'
+
+    async def generate(**request):
+        raise AssertionError('An edit must preserve actual reference inputs')
+
+    @asynccontextmanager
+    async def slot():
+        yield
+
+    monkeypatch.setattr(worker, 'image_slot', slot)
+    service = SimpleNamespace(ALL_REFERENCE_VIEWS={}, REFERENCE_VIEWS={}, DETAIL_VIEWS={},
+        AsyncOpenAI=lambda *args, **kwargs: SimpleNamespace(images=SimpleNamespace(edit=edit, generate=generate)))
+    context, prompts = worker.configure_shots(service, reference_plan())
+    for name in ('overview', 'right', 'front_right', 'identity-anchor'):
+        (tmp_path / (name + '.png')).write_bytes(name.encode())
+    scratch = tmp_path / 'worker-cache'
+    scratch.mkdir()
+    (scratch / 'overview.png').write_bytes(b'overview')
+
+    async def exercise():
+        context.set(('door_right_open', [tmp_path / (name + '.png') for name in ('overview', 'right', 'front_right')]))
+        with (scratch / 'overview.png').open('rb') as anchor, (tmp_path / 'identity-anchor.png').open('rb') as source:
+            assert await service.AsyncOpenAI().images.edit(image=[anchor, source], prompt='Original service prompt') == 'result'
+
+    asyncio.run(exercise())
+    assert calls[0]['files'] == ['right.png', 'front_right.png', 'overview.png', 'identity-anchor.png']
+    assert 'image 1: right' in calls[0]['prompt']
+    assert calls[0]['prompt'].index('ATTACHED REFERENCE IDENTITIES') < calls[0]['prompt'].index('FINAL SHOT CONTRACT')
+    assert prompts['door_right_open'] == calls[0]['prompt']
+
+
+def test_transport_failure_retains_safe_payload_fingerprint_and_elapsed_time(tmp_path, monkeypatch):
+    async def disconnect(**request):
+        raise ConnectionError('provider disconnected; credential must not appear in audit')
+
+    @asynccontextmanager
+    async def slot():
+        yield
+
+    monkeypatch.setattr(worker, 'image_slot', slot)
+    service = SimpleNamespace(ALL_REFERENCE_VIEWS={}, REFERENCE_VIEWS={}, DETAIL_VIEWS={},
+        AsyncOpenAI=lambda *args, **kwargs: SimpleNamespace(images=SimpleNamespace(edit=disconnect, generate=disconnect)))
+    context, _ = worker.configure_shots(service, reference_plan('Countach'))
+    source = tmp_path / 'rear_left.png'
+    source.write_bytes(b'immutable reference pixels')
+
+    async def exercise():
+        token = worker.state_storage.set(str(tmp_path / 'diagnostics'))
+        camera = context.set(('side_intake', [source]))
+        try:
+            with source.open('rb') as image:
+                with pytest.raises(ConnectionError):
+                    await service.AsyncOpenAI(api_key='secret-api-key').images.edit(
+                        image=[image], prompt='private prompt', model='gpt-image-fixture', quality='high', size='auto')
+        finally:
+            context.reset(camera)
+            worker.state_storage.reset(token)
+
+    asyncio.run(exercise())
+    path = tmp_path / 'diagnostics/reference-transport.jsonl'
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [row['status'] for row in records] == ['started', 'failed']
+    assert len({row['request_id'] for row in records}) == 1
+    assert records[0]['view'] == 'side_intake' and records[0]['prompt_sha256']
+    assert records[0]['inputs'] == [dict(name=source.name, bytes=source.stat().st_size,
+        sha256=hashlib.sha256(source.read_bytes()).hexdigest())]
+    assert records[1]['seconds'] >= 0 and records[1]['exception_type'] == 'ConnectionError'
+    assert 'secret-api-key' not in path.read_text() and 'private prompt' not in path.read_text()
+
+
+def test_rejected_anchor_is_edited_from_its_immutable_pixels(tmp_path, monkeypatch):
+    calls = []
+
+    async def edit(**request):
+        calls.append([Path(file.name).read_bytes() for file in request['image']])
+        return 'edited'
+
+    async def generate(**request):
+        raise AssertionError('Anchor repair must preserve the rejected vehicle identity')
+
+    @asynccontextmanager
+    async def slot():
+        yield
+
+    monkeypatch.setattr(worker, 'image_slot', slot)
+    service = SimpleNamespace(ALL_REFERENCE_VIEWS={}, REFERENCE_VIEWS={}, DETAIL_VIEWS={},
+        AsyncOpenAI=lambda *args, **kwargs: SimpleNamespace(images=SimpleNamespace(edit=edit, generate=generate)))
+    context, _ = worker.configure_shots(service, reference_plan())
+    anchor = tmp_path / 'overview-rejected.png'
+    anchor.write_bytes(b'original-white-cream-car')
+
+    async def exercise():
+        context.set(('overview', [anchor]))
+        assert await service.AsyncOpenAI().images.generate(prompt='Correct only the rim opening count') == 'edited'
+
+    asyncio.run(exercise())
+    assert calls == [[b'original-white-cream-car']]

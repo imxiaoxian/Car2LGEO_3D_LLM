@@ -50,7 +50,11 @@ export interface Design {
   created_at: string;
   completed_at?: string;
   error_message?: string;
+  library_match?: LibraryMatch | null;
 }
+
+export interface LibraryMatch { total: number; url: string; model_ids: string[] }
+export type CreateDesignResult = DesignDetail | { status: "matched"; library_match: LibraryMatch };
 
 export interface PhysicalSpecifications {
   version: string;
@@ -79,6 +83,18 @@ export interface PhysicalSpecifications {
 }
 
 export interface DesignDetail extends Design {
+  reference_gate?: { status: string; allowed: boolean; image_correct: boolean; blocked_views: string[] };
+  repair_tasks?: { id: string; view: string; kind: string; modules: string[]; expected: string; verification: string; status: string }[];
+  module_progress?: { status: string; completion_ready: boolean; complete: number; required: number | null; stale?: boolean;
+    modules: { id: string; status: string; parts: string[]; failures: string[]; unverified: string[] }[] };
+  module_tasks?: { planner: string; active: string | null; complete: number; required: number;
+    tasks: { id: string; dependencies: string[]; status: string; attempts: number; reason?: string;
+      evidence_current: boolean; provisional: true; candidates?: { passing: number; required: number } | null }[] } | null;
+  acceptance?: { status: string; accepted: boolean; gates: Record<string, string>; appearance_review_ready?: boolean;
+    review_inputs?: Record<string, string> | null };
+  inspection_images?: { view: string; url: string; category: string; synthetic: false }[];
+  assembly_planner?: string;
+  assembly_agent?: { planner: string; status: string; steps: number; stop_reason?: string; digital_status?: string } | null;
   workflow_version?: string;
   requested_scale?: string | null;
   scale_mode?: "auto" | "appearance" | "exact";
@@ -152,22 +168,28 @@ export async function createDesign(
   make: string,
   model: string,
   year?: number | null,
-  image_url?: string
-): Promise<DesignDetail> {
-  return fetchApi<DesignDetail>("/designs", {
+  image_url?: string,
+  assembly_planner?: string,
+  reuse_library?: boolean,
+  reconstruction_backend?: string
+): Promise<CreateDesignResult> {
+  return fetchApi<CreateDesignResult>("/designs", {
     method: "POST",
-    body: JSON.stringify({ make, model, year, image_url }),
+    body: JSON.stringify({ make, model, year, image_url, assembly_planner, reuse_library, reconstruction_backend }),
   });
 }
 
 export async function createDesignFromImage(
-  image: File, overrides: { make?: string; model?: string; year?: number } = {}
-): Promise<DesignDetail> {
+  image: File, overrides: { make?: string; model?: string; year?: number; assembly_planner?: string; reuse_library?: boolean; reconstruction_backend?: string } = {}
+): Promise<CreateDesignResult> {
   const form = new FormData();
   form.append("image", image);
   if (overrides.make) form.append("make", overrides.make);
   if (overrides.model) form.append("model", overrides.model);
   if (overrides.year) form.append("year", String(overrides.year));
+  if (overrides.assembly_planner) form.append("assembly_planner", overrides.assembly_planner);
+  if (overrides.reconstruction_backend) form.append("reconstruction_backend", overrides.reconstruction_backend);
+  if (overrides.reuse_library === false) form.append("reuse_library", "false");
   const response = await fetch(`${API_URL}/designs/from-image`, { method: "POST", body: form });
   if (!response.ok) throw new Error(await response.text());
   return response.json();
@@ -176,6 +198,16 @@ export async function createDesignFromImage(
 /** GET /designs/:id */
 export async function getDesign(id: string): Promise<DesignDetail> {
   return fetchApi<DesignDetail>(`/designs/${id}`);
+}
+
+export interface AssemblyPlanners {
+  default: string;
+  alternatives: { id: string; configured: boolean }[];
+  comparison_status: string;
+  winner?: string | null;
+}
+export function getAssemblyPlanners(): Promise<AssemblyPlanners> {
+  return fetchApi("/designs/assembly-planners");
 }
 
 export async function collectVehicleSpecifications(make: string, model: string, year: number | null): Promise<PhysicalSpecifications> {
@@ -247,6 +279,12 @@ export async function openInStudio(designId: string): Promise<{
   return fetchApi(`/designs/${designId}/studio-open`, { method: "POST" });
 }
 
+export function reviewAppearance(id: string, status: "pass" | "fail", inputs: Record<string, string>, notes: string) {
+  return fetchApi(`/designs/${id}/appearance-review`, {
+    method: "POST", body: JSON.stringify({ status, inputs, notes }),
+  });
+}
+
 /** GET /mods — get all modification parts catalog */
 export interface ModPartInfo {
   id: string;
@@ -284,11 +322,29 @@ export interface CatalogVehicle {
   scale_capabilities: ScaleCapability[]; recipe_available: boolean; precision_verified: boolean;
 }
 export async function getVehicleCatalog(): Promise<{ vehicles: CatalogVehicle[] }> { return fetchApi("/sets/vehicles"); }
+
+export interface LibraryBrand { id: string; en: string; zh: string; logo?: string | null }
+export interface OfficialModel {
+  id: string; name_zh: string; original_name: string; model: string; brands: LibraryBrand[];
+  vehicle_types: string[]; vehicle_type_labels: string[]; identity: string;
+  vehicle_year: number | null; vehicle_year_evidence: string; release_year: number | null;
+  set_num: string; variant: string; variant_zh: string; parts_count: number; steps_count: number;
+  filename: string; sha256: string; bytes: number; source_url: string; author: string; provider: string;
+  description_zh: string; unresolved_parts: string[]; missing_parts: string; missing_patterns: string; missing_stickers: string;
+  download_url: string; thumbnail_url?: string | null; image_kind: string;
+}
+export interface OfficialModelPage {
+  models: OfficialModel[]; total: number; collection_total: number; page: number; pages: number; per_page: number;
+  facets: { brands: LibraryBrand[]; types: {id: string; label: string}[]; vehicle_years: number[]; release_years: number[] };
+}
+export interface ModelPreviewStatus { status: "processing" | "ready" | "failed"; model_url?: string; error?: string; missing_geometry?: string[] }
+export function getOfficialModels(params: string): Promise<OfficialModelPage> { return fetchApi(`/sets/library?${params}`); }
+export function getOfficialModel(id: string): Promise<OfficialModel> { return fetchApi(`/sets/library/${id}`); }
 export async function getScales(): Promise<{ scales: ScaleCapability[]; default: string }> { return fetchApi("/designs/scales"); }
 export async function controlDesign(id: string, action: string, module?: string) {
   return fetchApi<DesignStatus>(`/designs/${id}/control/${action}${module ? `?module=${encodeURIComponent(module)}` : ""}`, { method: "POST" });
 }
 export interface ScenePart { id: string; part_num: string; color_id: number; module: string; feature: string; transform: { position: number[]; rotation: number[] } }
-export interface AssemblyScene { version: string; parts: ScenePart[]; modules: { id: string; parent?: string | null; depends_on: string[] }[]; steps: { index: number; module: string; parts: string[] }[]; joints: { id: string; child: string; parent: string; axis: number[]; pivot: number[]; limits: number[]; kind: string; capability: string; implemented: boolean }[] }
+export interface AssemblyScene { version: string; colors?: Record<number, number[]>; parts: ScenePart[]; modules: { id: string; parent?: string | null; depends_on: string[] }[]; steps: { index: number; module: string; parts: string[] }[]; joints: { id: string; child: string; parent: string; axis: number[]; pivot: number[]; limits: number[]; kind: string; capability: string; implemented: boolean }[] }
 export function getAssemblyScene(id: string): Promise<AssemblyScene> { return fetchApi(`/designs/${id}/scene`); }
 export function getAssemblyGeometry(id: string): Promise<Record<string, { color_id: number; positions: number[] }[]>> { return fetchApi(`/designs/${id}/geometry`); }

@@ -1,5 +1,6 @@
 """GPT vision-directed Blender modelling over the upstream MCP server and addon."""
 import ast
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -20,8 +21,9 @@ MODEL_TIMEOUT = 180
 MCP_TIMEOUT = 600
 
 
-PROMPT = """You are a senior automotive Blender modeller. Build an accurate detailed smooth car from ALL
-labelled whole-car and module-detail references supplied for this phase. This is a full-detail 3D reconstruction.
+PROMPT = """You are a senior automotive Blender modeller. Build an accurate smooth car from the
+labelled whole-car and module-detail references supplied for this phase. Follow the supplied detail
+standard: reconstruct features at the knowledge-base IO's detail level, not every real-car component.
 Return only JSON: {"analysis": "concise visual analysis and modelling plan", "code": "complete bpy script"}.
 Script runs via Blender MCP execute_blender_code in Blender 4.5. Use only bpy, math, mathutils, random.
 No filesystem, network, shell, addon installation, file loading or saving. Host code handles export/render.
@@ -45,22 +47,25 @@ add vertex groups join_<target car_role> containing ALL vertices along the actua
 and set car_connection_region='cabin', 'front' or 'rear'. Host samples those topology edges every 10 mm.
 If two disjoint edges meet the same role, use join_<role>__<edge_id> separately so interior cross-edges
 are not mistaken for seams. These groups contain contact-edge vertices only, not all panel vertices.
+For a closed solid, label its actual mounting edges rather than the decorative front-face perimeter.
+Short interfaces are valid when completely sampled; do not stretch or subdivide them to pad measured length.
 Include measured boundary groups for all three regions. Preserve intentional Countach-style creases;
 use matched tangents only where the reference has a continuous smooth transition.
-Separate named body, roof, windshield, side windows, rear glass, pillars, four tyres/rims/spokes,
-headlamps, rear light bar, intakes/grilles, rocker panels, door seams, handles, mirrors, spoiler as applicable.
+Use separate named objects for body, roof, pillars, four tyres/rims and the glazing, lamps,
+intakes/grilles, rocker panels, door seams, handles, mirrors and spoiler represented by the baseline.
 Name four tyre objects tyre_front_left, tyre_front_right, tyre_rear_left, tyre_rear_right.
 Tyre cylinders' axes are Y, wheels at front_overhang and front_overhang+wheelbase, authentic arch clearances.
 Use procedural meshes/curves for narrow vehicle-specific light signatures and vents, not only primitives.
-Glazing must be fitted TO the cabin surfaces, with finite 3-5 mm thickness, smoked transmissive
+Any included glazing must be fitted TO the cabin surfaces, with finite 3-5 mm thickness, smoked transmissive
 Principled glass (Transmission Weight .65-.9, IOR 1.45-1.52, roughness .08-.16, alpha=1).
 Use a moderately tinted base colour so the seats remain visible; do not use an opaque black plate.
 Keep thin fitted perimeter gaskets and real cabin openings. Inspect opposite views for consistency.
-Headlamps need a fitted shallow recess, dark housing, reflector and clear lens with finite thickness;
-tail lamps need coloured translucent lenses. Fit the lens perimeter to its housing, not a floating
+Match lamp outlines and construction to the baseline detail standard. Where separate optical layers
+are required, use a fitted recess, housing, reflector and finite-thickness lens; do not invent layers
+absent from the baseline. Fit any included lens perimeter to its housing, not a floating
 emissive rectangle. Preserve the reference's lamp outline, dividers and separate indicator segments.
 Each opening door is ONE assembly: create an EMPTY with car_role='door_assembly', and parent its
-door panel (car_role='door_panel'), window frame (car_role='door_frame'), and side glass
+door panel (car_role='door_panel'), window frame (car_role='door_frame'), and any included side glass
 (car_role='side_window') to it while preserving their world transforms. Separate fixed quarter glass
 from the moving door glass. The bottom/front/rear glass edges must meet its own frame/panel within
 15 mm; parenting alone is not a physical connection. Use shared boundary coordinates for door and glass.
@@ -76,12 +81,19 @@ Do not distort the cabin to obey low-confidence door/glass estimates: infer its 
 side views, especially the cowl, roof onset, rear cabin edge and windscreen rake. Include these choices
 in analysis. For angular cars retain angular surfaces; dense lofts do not imply rounding sharp creases.
 Model the sharp styling identity and image colours. Good topology, smooth shading, bevels where appropriate.
-Keep total evaluated triangles below 250000 and booleans limited. Don't subdivide Boolean result arbitrarily.
+Treat 250000 evaluated triangles as a performance advisory. Preserve styling within the agreed standard; use
+instances and shared mesh data for repeats. Do not simplify surfaces just to meet a triangle count.
+Keep booleans limited and don't subdivide Boolean results arbitrarily.
 Materials use Principled BSDF Base Color/Metallic/Roughness. Emit lenses via Emission Color/Strength.
 No text labels, ground plane, camera or light. The host adds a common render rig. No need to print vertices.
 Keep the script compact: use reusable mesh loft/arch helpers and roughly 120-220 lines of Python.
 Resolve the major silhouettes and distinct styling before fine trim; avoid lengthy speculative analysis.
 """
+
+
+def modelling_prompt(standard=None):
+    return PROMPT + ("\nDETAIL STANDARD (takes precedence over generic detail suggestions):\n"
+        + json.dumps(standard, sort_keys=True) if standard else "")
 
 
 def validate_code(code):
@@ -142,6 +154,7 @@ def call(tool, arguments, directory, name, port=9877):
 class BlenderSession:
     def __init__(self, directory, port=9877):
         self.directory, self.port = Path(directory), port
+        self.process = self.log = self.gpu_lock = None
 
     def __enter__(self):
         from dotenv import dotenv_values
@@ -156,6 +169,16 @@ class BlenderSession:
         with socket.socket() as probe:
             if probe.connect_ex(("127.0.0.1", self.port)) == 0:
                 raise ValueError(f"Experiment Blender port {self.port} is already in use")
+        from .gpu_lock import GPULock
+        self.gpu_lock = GPULock(purpose="blender", timeout=600)
+        self.gpu_lock.__enter__()
+        try:
+            return self._start(binary, config_directory)
+        except BaseException:
+            self.__exit__(None, None, None)
+            raise
+
+    def _start(self, binary, config_directory):
         self.log = (self.directory / "blender.log").open("wb")
         startup = None
         if os.name == "nt":
@@ -169,27 +192,36 @@ class BlenderSession:
                  "BLENDER_USER_CONFIG": str(config_directory.resolve())})
         for _ in range(120):
             if self.process.poll() is not None:
-                self.log.close()
                 raise RuntimeError("Blender startup failed; inspect blender.log")
             with socket.socket() as probe:
                 if probe.connect_ex(("127.0.0.1", self.port)) == 0:
                     return self
             time.sleep(.5)
-        self.__exit__(None, None, None)
         raise TimeoutError("Blender MCP startup timed out")
 
     def execute(self, code, name):
-        return call("execute_blender_code", {"code": code, "user_prompt": "Car2LEGO multiview modelling experiment"},
+        guard = (ROOT / "scripts/blender_mesh_guard.py").read_text(encoding="utf-8")
+        boundary = (ROOT / "scripts/blender_boundary_fit.py").read_text(encoding="utf-8")
+        return call("execute_blender_code", {"code": guard + "\n" + boundary + "\n" + code, "user_prompt": "Car2LEGO multiview modelling experiment"},
                     self.directory, name, self.port)
 
     def __exit__(self, *args):
-        self.process.terminate()
         try:
-            self.process.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
-        self.log.close()
+            if self.process is not None:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                    self.process.wait()
+        finally:
+            self.process = None
+            if self.log is not None:
+                self.log.close()
+                self.log = None
+            if self.gpu_lock is not None:
+                self.gpu_lock.__exit__(*args)
+                self.gpu_lock = None
 
 
 def render_code(directory, export=True, provenance=None):
@@ -211,16 +243,23 @@ def reconstruct(manifest_path, directory, vehicle_spec, review=True):
         from .staged_model import reconstruct as reconstruct_staged
         return reconstruct_staged(manifest_path, directory, vehicle_spec, review)
     spec = load_spec(vehicle_spec)
+    from .baseline_detail import detail_standard
+    standard = detail_standard(spec)
+    prompt = modelling_prompt(standard)
     images = dict(paths)
     if (Path(manifest_path).parent / "reference.png").is_file():
         images["overview"] = Path(manifest_path).parent / "reference.png"
     model = modelling_model()
     inputs = dict(backend="gpt-blender", model=model, views=manifest["views"],
-                  manifest_sha256=digest(manifest_path), vehicle_spec=spec_record(vehicle_spec))
+                  detail_standard=standard, modelling_prompt_sha256=sha256(prompt.encode()).hexdigest(),
+                  manifest_sha256=digest(manifest_path), vehicle_spec=spec_record(vehicle_spec),
+                  exporter_sha256=digest(ROOT / "scripts/blender_export_render.py"),
+                  mesh_guard_sha256=digest(ROOT / "scripts/blender_mesh_guard.py"),
+                  boundary_fit_sha256=digest(ROOT / "scripts/blender_boundary_fit.py"))
     with stage(directory, "reconstruction", inputs) as record:
         user = [{"type": "text", "text": json.dumps({"vehicle": spec, "brief": manifest.get("brief")}, ensure_ascii=False)},
                 *image_content(images)]
-        messages = [{"role": "system", "content": PROMPT}, {"role": "user", "content": user}]
+        messages = [{"role": "system", "content": prompt}, {"role": "user", "content": user}]
         response = ask_json(messages, directory, "model", max_tokens=24000, timeout=MODEL_TIMEOUT,
                             reuse_completed=True, model=model, stream=True, reasoning_effort="medium", transient_retries=2)
         with BlenderSession(directory) as blender:
@@ -246,7 +285,7 @@ def reconstruct(manifest_path, directory, vehicle_spec, review=True):
                 for path in directory.iterdir():
                     if path.suffix in {".png", ".glb", ".obj", ".mtl", ".blend"} or path.name in {"scene-metrics.json", "model-quality.json"}:
                         shutil.copyfile(path, before / path.name)
-                review_prompt = PROMPT.replace("Clear all scene objects before building.", "Preserve the existing scene.")
+                review_prompt = prompt.replace("Clear all scene objects before building.", "Preserve the existing scene.")
                 try:
                     feedback = ask_json([{"role": "system", "content": review_prompt + "\nReview the reference vs current renders. "
                         "Return JSON {analysis, code}; code is a corrective PATCH to the existing scene, not a fresh scene. "

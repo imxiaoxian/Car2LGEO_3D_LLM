@@ -1,5 +1,6 @@
 """Measured scene diagnostics for model refinement, independent of visual acceptance."""
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -9,7 +10,37 @@ from .common import digest, write_json
 from .vehicle import measurement, tyre_diameter
 
 
+def complete_seam_sampling(seam):
+    """Accept a short contact only with a complete edge-by-edge sampling record."""
+    sampling = seam.get("sampling")
+    if sampling is None:
+        return seam["sampled_length_m"] >= .02
+    if (not isinstance(sampling, dict) or sampling.get("schema") != "seam-sampling.v1"
+            or sampling.get("maximum_step_m") != .01):
+        return False
+    spans = sampling.get("edges")
+    if not isinstance(spans, list) or not spans or len(spans) != seam.get("source_edge_count"):
+        return False
+    offset, total = 0, 0
+    for span in spans:
+        if not isinstance(span, dict):
+            return False
+        length = span.get("length_m")
+        if (not isinstance(length, (int, float)) or isinstance(length, bool)
+                or not math.isfinite(length) or length <= 1e-8):
+            return False
+        count = max(2, math.ceil(length / .01)) + 1
+        if span.get("offset") != offset or span.get("count") != count:
+            return False
+        offset += count
+        total += length
+    return (offset == seam["sample_count"]
+        and math.isclose(total, seam["sampled_length_m"], rel_tol=1e-6, abs_tol=1e-9))
+
+
 def assess_model(directory, spec, body_style=None):
+    from .baseline_detail import detail_standard
+    standard = detail_standard(spec)
     directory = Path(directory)
     metrics_path = directory / "scene-metrics.json"
     metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
@@ -84,29 +115,58 @@ def assess_model(directory, spec, body_style=None):
     if body_style not in {"f1_race", "convertible"}:
         windows = {o["name"] for o in objects if o.get("role") == "side_window"}
         checked_windows = {c["window"] for c in contacts}
-        checks.append(dict(name="door_window_assemblies", passed=bool(len(windows) >= 2
-            and checked_windows == windows and len({c["door"] for c in contacts}) >= 2),
+        minimum = 2 if standard is None or standard["separate_door_glass_required"] else 0
+        checks.append(dict(name="door_window_assemblies", passed=bool(len(windows) >= minimum
+            and checked_windows == windows and len({c["door"] for c in contacts}) >= min(2, len(windows))),
+            applicable=bool(windows) or minimum > 0,
+            basis="baseline_io" if standard else "generic_vehicle",
             window_count=len(windows), measured_windows=sorted(checked_windows)))
     for contact in contacts:
         distances = contact["lower_edge_anchor_distances_m"]
         checks.append(dict(name=contact["window"] + ".door_contact", passed=bool(
             len(distances) == 2 and all(d is not None and d <= .02 for d in distances)),
             distances_m=distances, door=contact["door"], tolerance_m=.02))
+    perimeters = metrics.get("door_perimeter_contacts", [])
+    expected_perimeters = {o["name"] for o in objects if o.get("role") in {"side_window", "door_panel"}}
+    if expected_perimeters:
+        checks.append(dict(name="door_perimeter_evidence", passed=(
+            {row["source"] for row in perimeters} == expected_perimeters),
+            issue="Complete panel and glass boundaries need measurement, not only two lower anchors"))
+    for perimeter in perimeters:
+        distances = perimeter["distances_m"]
+        measured = (perimeter.get("boundary_status") == "measured" and bool(perimeter["targets"])
+            and len(distances) >= 3 and len(distances) == perimeter["sample_count"]
+            and perimeter["sampled_length_m"] >= .02
+            and all(d is not None and np.isfinite(d) for d in distances))
+        maximum = max(distances) if measured else None
+        checks.append(dict(name=perimeter["source"] + ".perimeter_seating",
+            passed=bool(measured and maximum <= .012), max_gap_m=maximum, tolerance_m=.012,
+            boundary_status=perimeter.get("boundary_status"),
+            sampled_length_m=perimeter["sampled_length_m"], sample_count=len(distances),
+            worst_samples=perimeter.get("worst_samples", []), targets=perimeter["targets"]))
     for visibility in metrics.get("glass_visibility", []):
         checks.append(dict(name=visibility["window"] + ".visibility", passed=visibility["visible_fraction"] >= .8,
                            visible_fraction=visibility["visible_fraction"], first_hits=visibility["first_hits"]))
     for seam in metrics.get("surface_connections", []):
         distances = seam["distances_m"]
-        measured = bool(seam["targets"] and len(distances) >= 3 and seam["sampled_length_m"] >= .02
+        sampling_complete = complete_seam_sampling(seam)
+        measured = bool(seam["targets"] and len(distances) >= 3 and sampling_complete
+                        and seam.get("boundary_width_coverage", 1) >= .95
                         and len(distances) == seam["sample_count"]
                         and all(d is not None and np.isfinite(d) for d in distances))
         maximum = max(distances) if measured else None
         checks.append(dict(name=seam["source"] + ".connection." + seam["seam"],
             passed=bool(measured and maximum <= .012), max_gap_m=maximum, tolerance_m=.012,
             sampled_length_m=seam["sampled_length_m"], sample_count=seam["sample_count"],
+            sampling_complete=sampling_complete,
+            boundary_width_coverage=seam.get("boundary_width_coverage"),
+            worst_samples=seam.get("worst_samples", []),
             targets=seam["targets"], region=seam["region"]))
-    checks.append(dict(name="triangle_budget", actual=metrics.get("triangles", 0),
-        passed=0 < metrics.get("triangles", 0) <= 250000))
+    triangles = metrics.get("triangles", 0)
+    checks.append(dict(name="nonempty_mesh", actual=triangles, passed=triangles > 0))
+    performance = dict(triangles=triangles, advisory_triangle_budget=250000,
+        status="warning" if triangles > 250000 else "within_advisory_budget",
+        blocks_geometry=False, detail_reduction_authorized=False)
     for view in ("front", "back", "left", "right", "three-quarter", "rear-quarter"):
         path = directory / f"render-{view}.png"
         if not path.is_file():
@@ -119,10 +179,11 @@ def assess_model(directory, spec, body_style=None):
         checks.append(dict(name=view + ".pixels", visible_fraction=fraction, clipped=clipped,
                            passed=.015 < fraction < .85 and not clipped))
     failures = [c for c in checks if not c["passed"]]
-    result = dict(schema_version=1, status="pass" if not failures else "needs_revision", checks=checks,
+    result = dict(schema_version=3, status="pass" if not failures else "needs_revision", checks=checks,
+        performance=performance, detail_standard=standard,
         failed_checks=len(failures), metrics_sha256=digest(metrics_path), appearance_accepted=False,
         limitations=["Checks measure scene geometry against model-estimated priors; they do not establish visual likeness.",
-                     "Door contact samples do not validate hinges, physical assembly or manufacturing fit.",
+                     "Door perimeter distances do not validate hinge travel, physical assembly or manufacturing fit.",
                      "Seam distances measure declared source edges to target surfaces, not tangency, penetration or watertightness."])
     write_json(directory / "model-quality.json", result)
     return result

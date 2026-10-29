@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer
 import json
 from pathlib import Path
 from threading import Event, Thread
+from urllib.parse import unquote
 
 import pytest
 
@@ -40,6 +41,44 @@ def test_imported_completion_is_draft_without_embedded_acceptance_reference(stor
     scene = desktop.scene(id)
     assert scene["steps"][0]["parts"] == [scene["parts"][0]["id"]]
     assert scene["joints"] == []
+
+
+@pytest.mark.parametrize("brand,model,name", [
+    ("Lamborghini", "Countach 5000 Quattrovalvole", "兰博基尼康塔什 Countach 5000 Quattrovalvole"),
+    ("Ferrari", "F40", "法拉利 F40"),
+    ("Nissan", "Skyline GT-R (R34)", "《速度与激情2》日产 Skyline GT-R (R34) 跑车"),
+    ("Bugatti", "Chiron Pur Sport", "布加迪 Chiron Pur Sport 超级跑车")])
+def test_creation_downloads_use_current_vehicle_names_without_official_set_claims(store, brand, model, name):
+    desktop, id = store
+    write_json(desktop.directory(id) / "request.json", dict(brand=brand, model=model))
+    assert desktop.export_filename(id, "io") == name + ".io"
+    assert desktop.export_filename(id, "glb") == name + "-glb.glb"
+
+
+def test_bugatti_io_download_preserves_bytes_and_utf8_vehicle_filename(store):
+    desktop, id = store
+    write_json(desktop.directory(id) / "request.json", dict(brand="Bugatti", model="Chiron Pur Sport"))
+    path = desktop.export(id, "io")
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"download contract fixture, not a validated Studio archive")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(Handler, jobs=desktop.jobs,
+        desktop=desktop, directory=str(ROOT / "frontend/public")))
+    thread = Thread(target=server.serve_forever)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port)
+    try:
+        connection.request("GET", f"/api/v1/export/io/{id}")
+        response = connection.getresponse()
+        assert response.status == 200
+        assert response.read() == path.read_bytes()
+        disposition = response.getheader("Content-Disposition")
+        assert 'filename="model.io"' in disposition
+        assert unquote(disposition.split("filename*=UTF-8''", 1)[1]) == "布加迪 Chiron Pur Sport 超级跑车.io"
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 
 def test_rich_reference_details_and_batch_state_are_available_over_http(store):
@@ -100,6 +139,53 @@ def test_generation_uses_published_worker_images_and_keeps_legacy_reference_path
     assert len(desktop.detail(id)["reference_images"]) == 1
     with pytest.raises(FileNotFoundError):
         desktop.reference_file(id, "not_a_camera")
+
+
+def test_failed_image_job_exposes_current_sanitized_provider_failure(store):
+    desktop, identity = store
+    desktop.update(identity, status="failed", stage="reference_images", error="Generic pipeline error")
+    dispatch_path = desktop.artifacts(identity) / "01-image/car2lego/reference-dispatch.json"
+    write_json(dispatch_path, dict(status="failed", failed_views=["rear_right"],
+        failed_details={"rear_right": dict(message="HTTP 400 content_policy_violation", retryable=False)}))
+    state = desktop.state(identity)
+    assert state["status"] == "failed"
+    assert state["error_message"] == "参考图生成失败：rear_right: HTTP 400 content_policy_violation"
+    desktop.update(identity, stage="reconstruction", error="New modeling failure")
+    assert desktop.state(identity)["error_message"] == "New modeling failure"
+    desktop.update(identity, stage="reference_images")
+    write_json(dispatch_path, dict(status="completed", failed_views=[], failed_details={}))
+    assert desktop.state(identity)["error_message"] == "New modeling failure"
+
+
+def test_every_advertised_delivery_render_is_served_without_allowing_extra_paths(store):
+    from car2lego3d.desktop import RENDER_VIEWS
+    desktop, identity = store
+    for view in RENDER_VIEWS:
+        path = desktop.artifacts(identity) / f"05-presentation/render_{view}.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(view.encode())
+    detail = desktop.detail(identity)
+    assert {row["view"] for row in detail["renders"]} == set(RENDER_VIEWS)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(Handler, jobs=desktop.jobs,
+        desktop=desktop, directory=str(ROOT / "frontend/public")))
+    thread = Thread(target=server.serve_forever)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port)
+    try:
+        for row in detail["renders"]:
+            connection.request("GET", row["url"])
+            response = connection.getresponse()
+            assert response.status == 200 and response.read() == row["view"].encode()
+        for suffix in ("not_a_camera", "nested/front", "../request.json"):
+            connection.request("GET", f"/api/v1/designs/{identity}/renders/{suffix}")
+            response = connection.getresponse()
+            assert response.status == 404
+            response.read()
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 
 def test_specification_mapping_preserves_unknown_and_estimates():

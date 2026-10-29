@@ -7,12 +7,14 @@ from car2lego3d.common import ROOT
 from car2lego3d.project import PROJECT_NAME, DEFAULT_BACKEND, FRONTEND_PORT, API_PORT, desktop_backend
 
 
-def test_desktop_backend_is_llm_blender_only():
+def test_desktop_backend_defaults_to_blender_and_requires_explicit_routing():
     assert PROJECT_NAME == "Car2LGEO_3D_LLM"
     assert desktop_backend() == DEFAULT_BACKEND == "gpt-blender"
     assert desktop_backend("gpt-blender") == DEFAULT_BACKEND
-    with pytest.raises(ValueError, match="Car2LEGO_3D"):
-        desktop_backend("hunyuan-mv")
+    assert desktop_backend("hunyuan-mv") == "hunyuan-mv"
+    assert desktop_backend("hybrid") == "hybrid"
+    with pytest.raises(ValueError, match="Unknown"):
+        desktop_backend("invalid")
     assert (FRONTEND_PORT, API_PORT) == (8778, 8777)
 
 

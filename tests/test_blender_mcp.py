@@ -58,10 +58,14 @@ def test_blender_preferences_stay_in_run_directory(tmp_path, monkeypatch):
     process.poll.return_value = None
     with patch.object(blender_mcp.socket, "socket", return_value=probe), \
             patch.object(blender_mcp, "upstream", return_value=tmp_path), \
+            patch("car2lego3d.gpu_lock.GPULock") as gpu_lock, \
             patch.object(blender_mcp.subprocess, "Popen", return_value=process) as launch:
         with blender_mcp.BlenderSession(tmp_path):
             assert launch.call_args.kwargs["env"]["BLENDER_USER_CONFIG"] == str((tmp_path / "blender-user-config").resolve())
         process.terminate.assert_called_once()
+        gpu_lock.assert_called_once_with(purpose="blender", timeout=600)
+        gpu_lock.return_value.__enter__.assert_called_once()
+        gpu_lock.return_value.__exit__.assert_called_once()
 
 
 @pytest.mark.parametrize("code", ["import os", "from . import unsafe", "open('file')", "bpy.ops.wm.open_mainfile()"])

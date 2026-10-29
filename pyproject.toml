@@ -23,6 +23,7 @@ dependencies = [
 test = ["pytest==8.3.3"]
 brands = ["httpx==0.28.1", "beautifulsoup4==4.14.2"]
 native = ["ldraw-mcp==0.3.1"]
+brickwright = ["bricklayer-sdk==0.1.0"]
 multiview = ["pymeshlab==2023.12.post3", "pygltflib==1.16.3", "opencv-python==4.10.0.84"]
 gpt = ["openai>=2.20,<3", "langchain-openai>=1,<2", "pydantic-settings>=2,<3"]
 blender = ["mcp>=1.26,<2"]

@@ -11,6 +11,7 @@ import sys
 from .common import ROOT, device_name, digest, model_lock, stage, write_json
 
 VIEWS = ("front", "left", "back", "right")
+REFERENCE_GROUPS = ("views", "supplemental_views", "details", "interior_views")
 
 
 def download_weights(workers=8):
@@ -158,22 +159,60 @@ def snapshot_views(source, directory):
     import shutil
     from .references import load_references
     manifest, paths = load_references(source)
+    if manifest.get("schema_version") == 1:
+        manifest, groups = load_reference_images(source)
+        paths = {name: path for rows in groups.values() for name, path in rows.items()}
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     copied = {}
     for name, origin in paths.items():
         destination = directory / f"{name}.png"
         shutil.copyfile(origin, destination)
-        copied[name] = {**(manifest.get('shots') or manifest['views'])[name], "file": destination.name}
+        records = manifest.get("shots") or {name: item for group in REFERENCE_GROUPS
+            for name, item in manifest.get(group, {}).items()}
+        copied[name] = {**records[name], "file": destination.name}
     anchor = Path(source).parent / "reference.png"
     if anchor.is_file():
         shutil.copyfile(anchor, directory / "reference.png")
     output = directory / "views.json"
     write_json(output, {**manifest, "views": {v: copied[v] for v in VIEWS},
+                       **({group: {name: copied[name] for name in manifest.get(group, {})}
+                           for group in REFERENCE_GROUPS[1:]} if manifest.get("schema_version") == 1 else {}),
                        **({'shots': copied} if manifest.get('schema_version') == 2 else {})})
     write_json(directory / "import.json", {"source_manifest": str(Path(source).resolve()),
                "source_sha256": digest(source), "imported": True, "new_image_api_calls": 0})
     return output
+
+
+def load_reference_images(path):
+    """Retain auxiliary evidence without adding it to four-camera inference."""
+    import re
+    from PIL import Image
+    path = Path(path).resolve()
+    manifest, primary = load_views(path)
+    groups = {"views": primary, **{group: {} for group in REFERENCE_GROUPS[1:]}}
+    if manifest.get("schema_version") == 2:
+        from .references import load_references
+        _, images = load_references(path)
+        for name, image in images.items():
+            if name not in primary:
+                groups["details"][name] = image
+        return manifest, groups
+    names = set(primary)
+    for group in REFERENCE_GROUPS[1:]:
+        for name, item in manifest.get(group, {}).items():
+            if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or name in names:
+                raise ValueError("Reference labels must be unique safe identifiers")
+            names.add(name)
+            source = (path.parent / item["file"]).resolve()
+            if not source.is_relative_to(path.parent):
+                raise ValueError("Reference files must stay inside the manifest directory")
+            if digest(source) != item["sha256"]:
+                raise ValueError(f"Reference checksum mismatch: {name}")
+            with Image.open(source) as image:
+                image.verify()
+            groups[group][name] = source
+    return manifest, groups
 
 
 def reuse_reconstruction(source, directory, manifest_path, vehicle_spec, resolution, steps, seed):
@@ -181,9 +220,13 @@ def reuse_reconstruction(source, directory, manifest_path, vehicle_spec, resolut
     source, directory = Path(source).resolve(), Path(directory).resolve()
     manifest, _ = load_views(manifest_path)
     record = json.loads((source / "reconstruction.json").read_text(encoding="utf-8"))
-    expected = {"backend": "hunyuan-mv", "views": manifest["views"], "resolution": resolution,
+    expected = {"backend": "hunyuan-mv", "resolution": resolution,
                 "steps": steps, "seed": seed}
-    if record["status"] != "completed" or any(record["inputs"].get(k) != v for k, v in expected.items()):
+    cached_views = record.get("inputs", {}).get("views", {})
+    matching_images = (set(cached_views) == set(VIEWS) and
+        all(cached_views[v].get("sha256") == manifest["views"][v]["sha256"] for v in VIEWS))
+    if (record["status"] != "completed" or not matching_images or
+            any(record["inputs"].get(k) != v for k, v in expected.items())):
         raise ValueError("Reconstruction cache does not match the requested views or inference settings.")
     for key in ("hunyuan3d_code", "hunyuan3d_weights"):
         if record["models"].get(key) != model_lock()[key]:

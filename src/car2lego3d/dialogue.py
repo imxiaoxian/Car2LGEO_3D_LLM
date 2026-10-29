@@ -6,7 +6,7 @@ import os
 import time
 
 from dotenv import dotenv_values
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from .common import ROOT, write_json
 from .gpt_reference import configuration
@@ -23,12 +23,19 @@ def settings(model_key="OPENAI_MODEL", default_model="gpt-6.1-sol"):
                 model=value(model_key, default_model))
 
 
-def image_content(paths):
+def image_content(paths, *, label_images=False):
     content = []
     for label, path in paths.items():
         with Image.open(path) as image:
             image = image.convert("RGB")
             image.thumbnail((1200, 1200))
+            if label_images:
+                # Keep the identifier inside the pixels when a vision model reorders attachments.
+                labelled = Image.new("RGB", (max(image.width, 480), image.height + 48), "white")
+                labelled.paste(image, (0, 48))
+                ImageDraw.Draw(labelled).text((12, 10), label, fill="black",
+                    font=ImageFont.load_default(size=24))
+                image = labelled
             stream = BytesIO()
             image.save(stream, format="JPEG", quality=92)
         content.extend([{"type": "text", "text": label}, {"type": "image_url", "image_url": {
@@ -167,6 +174,12 @@ class ModelStreamInterrupted(RuntimeError):
     pass
 
 
+class ModelJSONError(ValueError):
+    def __init__(self, text, error):
+        super().__init__(f'Completed model text is invalid JSON: {error.msg} at line {error.lineno}, column {error.colno}')
+        self.text = text
+
+
 def transient_error(error):
     from openai import APIConnectionError, APIStatusError, APIError
     if isinstance(error, (APIConnectionError, ConnectionError, ModelStreamInterrupted)):
@@ -190,7 +203,11 @@ def parse_response(raw):
              for part in item.get("content", []) if part.get("type") == "output_text"]
     if not texts or any(not isinstance(text, str) for text in texts):
         raise ValueError("Completed model response has no valid output text")
-    return parse_json("".join(texts))
+    text = "".join(texts)
+    try:
+        return parse_json(text)
+    except json.JSONDecodeError as error:
+        raise ModelJSONError(text, error) from error
 
 
 def parse_json(content):
