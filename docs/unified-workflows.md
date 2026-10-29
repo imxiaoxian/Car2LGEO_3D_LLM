@@ -51,4 +51,4 @@
 
 ### 清理状态
 
-实现提交 `f422515` 及三个历史归档标签已推送，草稿 [PR #1](https://github.com/imxiaoxian/Car2LGEO_3D_LLM/pull/1) 已建立。旧 GitHub 仓库删除返回 HTTP 403，当前令牌缺少 `delete_repo` 权限；本地旧工作树清理命令在启动前被执行环境自动审批以 `blocked by policy` 拒绝，未提供更具体原因。三个旧目录均仍存在，未将授权、迁移或备份完成标记为删除成功。详细状态保存在仓库外备份的 `deletion-status.json`。
+实现提交 `f422515` 及三个历史归档标签已推送，草稿 [PR #1](https://github.com/imxiaoxian/Car2LGEO_3D_LLM/pull/1) 已建立。2026-10-30 用户完成新的 GitHub 设备授权，本机确认取得 `delete_repo` 权限后，旧远端 `imxiaoxian/Car2LEGO_3D` 删除成功；登录状态下复查返回 HTTP 404，保留仓库仍可访问。本地旧工作树清理命令此前在启动前被执行环境自动审批以 `blocked by policy` 拒绝，未提供更具体原因，三个旧目录仍存在。本地和远端删除状态分别记录，详细状态保存在仓库外备份的 `deletion-status.json`。
