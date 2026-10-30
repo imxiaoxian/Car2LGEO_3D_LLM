@@ -128,6 +128,82 @@ def test_native_snap_render_export_and_reopen(tmp_path, native):
     assert json.loads((tmp_path / "checks.json").read_text())["gates"]["physical"] == "unverified"
 
 
+@pytest.mark.parametrize("tool", ["snap", "attach", "build"])
+@pytest.mark.parametrize("compatible_count", [0, 12])
+def test_incompatible_ports_give_bounded_native_types_without_mutation(tmp_path, monkeypatch, tool, compatible_count):
+    from car2lego3d.native_ports import Port
+    tools = AssemblyTools(tmp_path, tmp_path / "native")
+    target, source = add(tools), add(tools, -100)
+    ports = [Port("stud", "stud", 0, (0, 0, 0), (0, 1, 0), altitude=20, area=4)]
+    ports += [Port(f"hole-{i}", "hole", 0, (i * 10, 24, 0), (0, 1, 0), altitude=20, area=4)
+              for i in range(compatible_count)]
+    ports.append(Port("incompatible-hole", "hole", 0, (0, 0, 0), (0, 1, 0), altitude=40, area=4))
+    monkeypatch.setattr(tools.catalog, "ports", lambda _: ports)
+    before = (tools.assembly.graph(), tools.assembly.text(), (tmp_path / "state.json").read_bytes())
+    arguments = dict(revision=2, source_port="stud", target=target, target_port="stud")
+    if tool == "snap":
+        arguments["source"] = source
+    else:
+        arguments["part"] = "3001.dat"
+        if tool == "build":
+            arguments = dict(revision=2, operations=[dict(op="attach",
+                **{key: value for key, value in arguments.items() if key != "revision"})])
+    result = tools.call(tool, arguments)
+    assert result["ok"] is False
+    feedback = json.loads(result["error"].split("Incompatible connector types: ", 1)[1])
+    assert result["diagnostic"] == feedback
+    for endpoint in ("source", "target"):
+        assert feedback[endpoint]["part"] == "3001.dat"
+        assert feedback[endpoint]["port"]["id"] == "stud"
+        assert feedback[endpoint]["port"]["kind"] == "stud"
+        suggestions = feedback[endpoint + "_alternatives"]
+        assert suggestions["total"] == compatible_count
+        assert suggestions["truncated"] is (compatible_count > 8)
+        assert [p["id"] for p in suggestions["ports"]] == [f"hole-{i}" for i in range(min(8, compatible_count))]
+        assert all(compatible(next(p for p in ports if p.id == row["id"]), ports[0])
+                   for row in suggestions["ports"])
+    assert "remain unverified" in feedback["scope"]
+    assert result["revision_before"] == result["revision_after"] == 2
+    assert (tools.assembly.graph(), tools.assembly.text(), (tmp_path / "state.json").read_bytes()) == before
+    assert AssemblyTools(tmp_path, tmp_path / "native").assembly.text() == before[1]
+    from car2lego3d.assembly_agent import AssemblyAgent
+    agent = AssemblyAgent(tools, None, {})
+    payload = agent.context([dict(decision=dict(tool=tool), observation=result)], remaining=1)
+    assert payload["last"]["diagnostic"] == feedback
+    assert payload["last"]["resource"] == "error"
+    if tool == "build":
+        assert feedback["build_operation"] == 0
+
+
+@pytest.mark.parametrize("tool", ["snap", "attach"])
+def test_native_glass_panel_incompatibility_reports_actual_catalog_ports(tmp_path, native, tool):
+    tools = AssemblyTools(tmp_path, native)
+    added = tools.call("edit", dict(revision=0, operations=[
+        dict(op="add", alias="panel", part="59349.dat", matrix=np.eye(4).tolist()),
+        dict(op="add", alias="glass", part="4215a.dat", matrix=np.eye(4).tolist())]))
+    assert added["ok"], added
+    ids = added["result"]["aliases"]
+    before = (tools.assembly.graph(), (tmp_path / "state.json").read_bytes())
+    arguments = dict(revision=1, source_port="0:0:2", target=ids["panel"], target_port="0:0:4")
+    arguments.update(dict(source=ids["glass"]) if tool == "snap" else dict(part="4215a.dat"))
+    result = tools.call(tool, arguments)
+    assert not result["ok"], result
+    feedback = json.loads(result["error"].split("Incompatible connector types: ", 1)[1])
+    for endpoint, part in (("source", "4215a.dat"), ("target", "59349.dat")):
+        assert feedback[endpoint]["part"] == part
+        selected = next(p for p in tools.catalog.ports(part) if p.id == feedback[endpoint]["port"]["id"])
+        assert feedback[endpoint]["port"]["kind"] == selected.kind
+        assert feedback[endpoint]["port"]["area"] == selected.area == 2
+        opposite = "target" if endpoint == "source" else "source"
+        other = next(p for p in tools.catalog.ports(feedback[opposite]["part"])
+                     if p.id == feedback[opposite]["port"]["id"])
+        expected = [p.id for p in tools.catalog.ports(part) if compatible(p, other)]
+        alternatives = feedback[endpoint + "_alternatives"]
+        assert alternatives["total"] == len(expected)
+        assert [p["id"] for p in alternatives["ports"]] == expected[:8]
+    assert (tools.assembly.graph(), (tmp_path / "state.json").read_bytes()) == before
+
+
 def test_snap_module_keeps_panel_glass_and_joint_together(tmp_path, native):
     tools = AssemblyTools(tmp_path, native)
     matrix, glass = np.eye(4), np.eye(4)

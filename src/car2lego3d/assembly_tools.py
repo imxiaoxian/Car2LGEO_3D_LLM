@@ -51,6 +51,12 @@ TOOLS = {
 }
 
 
+class ConnectorCompatibilityError(ValueError):
+    def __init__(self, diagnostic):
+        self.diagnostic = diagnostic
+        super().__init__("Incompatible connector types: " + json.dumps(diagnostic))
+
+
 def compact(graph, offset=0, limit=50):
     if type(offset) is not int or type(limit) is not int or offset < 0 or not 1 <= limit <= 200:
         raise ValueError("Invalid graph page")
@@ -224,6 +230,8 @@ class AssemblyTools:
                     revision_after=self.assembly.revision, ok=False, error=f"{type(error).__name__}: {error}")
                 if diagnostic is not None:
                     record["diagnostic"] = diagnostic
+                if isinstance(error, ConnectorCompatibilityError):
+                    record["diagnostic"] = error.diagnostic
                 if isinstance(error, AssemblyControlError):
                     control_error = error
             with (self.directory / "trajectory.jsonl").open("a", encoding="utf-8") as f:
@@ -373,10 +381,28 @@ class AssemblyTools:
             raise ValueError("Moving instance must be the source or its ancestor module")
         if target == moving or target.startswith(moving + "/"):
             raise ValueError("Snap target must be outside the moving subtree")
-        pa = next(p for p in self.catalog.ports(a["part"]) if p.id == source_port)
-        pb = next(p for p in self.catalog.ports(b["part"]) if p.id == target_port)
+        source_ports, target_ports = self.catalog.ports(a["part"]), self.catalog.ports(b["part"])
+        pa = next(p for p in source_ports if p.id == source_port)
+        pb = next(p for p in target_ports if p.id == target_port)
         if not compatible(pa, pb):
-            raise ValueError("Incompatible connector types")
+            def describe(port):
+                return {key: getattr(port, key) for key in
+                    ("id", "kind", "subtype", "semantic", "altitude", "area", "tag")}
+
+            def alternatives(ports, other):
+                matches = [port for port in ports if compatible(port, other)]
+                return dict(ports=[describe(port) for port in matches[:8]], total=len(matches),
+                            truncated=len(matches) > 8)
+
+            diagnostic = dict(kind="connector_type_mismatch",
+                source=dict(instance=source, part=a["part"], port=describe(pa)),
+                target=dict(instance=target, part=b["part"], port=describe(pb)),
+                source_alternatives=alternatives(source_ports, pb),
+                target_alternatives=alternatives(target_ports, pa),
+                scope="Connector-type compatibility only, keeping the opposite selected port fixed. "
+                    "Query exact native port positions before retrying. Seating, keyed orientation, "
+                    "collisions, connectivity and motion remain unverified.")
+            raise ConnectorCompatibilityError(diagnostic)
         wa, wb = np.array(a["world"]), np.array(b["world"])
         original = wa.copy()
         da, db = wa[:3, :3] @ pa.direction, wb[:3, :3] @ pb.direction
@@ -517,6 +543,8 @@ class AssemblyTools:
                 graph=compact(self.assembly.graph()))
         except Exception as error:
             self.assembly = before
+            if isinstance(error, ConnectorCompatibilityError):
+                raise ConnectorCompatibilityError(dict(error.diagnostic, build_operation=index)) from error
             raise ValueError(f"Build rolled back at operation {index}: {error}") from error
 
     def tool_check(self):
