@@ -1,7 +1,14 @@
-# Steerable wheel module evidence (2026-10-30)
+# Car module evidence (2026-10-30)
 
-The live Codex planner completed one description-selected steerable wheel on a
-supplied fixed support. This establishes a bounded digital module loop. Linked
+The single-wheel sections below record the earlier live planner milestone.
+The later deterministic 33-part closed-linkage chassis passes sampled native
+kinematics, four-wheel layout and IO roundtrip checks, as documented in
+[closed-linkage evidence](closed-linkage-20261030.md). That fixture is not an
+autonomous planner-selected chassis or whole-car acceptance.
+
+At the single-wheel milestone, the live Codex planner completed one
+description-selected steerable wheel on a supplied fixed support. This
+establishes a bounded digital module loop. Linked
 two-wheel steering, chassis integration, axle retention, load capacity, physical
 assembly order and whole-car appearance remain unverified.
 
@@ -68,8 +75,10 @@ frontend service was not replaced. Logs are
 `runs/car-modules-regression-20261030.log` and
 `runs/car-modules-frontend-build-20261030.log`.
 
-The next module milestone is linked left/right steering installed in a connected
-chassis, with actual wheel-axis response and persistent native contacts. Existing
+The next milestone after this historical single-wheel run was linked left/right
+steering installed in a connected chassis, with actual wheel-axis response and
+persistent native contacts. The later deterministic fixture establishes that
+tool capability; a live planner trial remains pending. Existing
 axial-clearance diagnostics do not establish physical retention. This single
 seeded wheel is not an autonomous whole car, an unseen-part generalization
 result, a Studio GUI acceptance result or a physically accepted assembly.

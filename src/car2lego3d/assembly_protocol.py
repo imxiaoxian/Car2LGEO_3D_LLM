@@ -3,7 +3,7 @@ import json
 from hashlib import sha256
 from jsonschema import Draft202012Validator
 
-VERSION = "assembly-tools.v11"
+VERSION = "assembly-tools.v12"
 
 def obj(properties, required=()):
     return dict(type="object", properties=properties, required=list(required), additionalProperties=False)
@@ -85,6 +85,11 @@ SCHEMAS = {
         ["revision", "module", "label"]),
     "restore_candidate": obj(dict(revision=I, module=S, candidate=S), ["revision", "module", "candidate"]),
     "check": obj({}), "motion": obj(dict(samples=dict(type="integer", minimum=9, maximum=181))),
+    "linkage_motion": obj(dict(driver=S,
+        passive=dict(type="array", items=S, minItems=1, maxItems=8, uniqueItems=True),
+        rolling=dict(type="array", items=S, minItems=1, maxItems=4, uniqueItems=True),
+        samples=dict(type="integer", minimum=9, maximum=181),
+        max_evaluations=dict(type="integer", minimum=1, maximum=20000)), ["driver", "passive"]),
     "render": obj({}), "preview": obj({}), "export": obj({}),
 }
 DECISION = obj(dict(tool={"enum": [*SCHEMAS, "finish"]}, arguments_json={"type": "string"}, reason={"type": "string"}), ["tool", "arguments_json", "reason"])

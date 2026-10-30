@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 import pytest
 
-from car2lego3d.assembly_agent import AssemblyAgent, wire_json
+from car2lego3d.assembly_agent import AssemblyAgent, context_guide, wire_json
 from car2lego3d.assembly_catalog import NativeCatalog
 from car2lego3d.assembly_graph import Assembly
 from car2lego3d.assembly_tools import AssemblyTools
@@ -111,6 +111,10 @@ def test_module_context_supplies_full_task_and_keeps_unrelated_geometry_addressa
     assert payload["module_task"]["prerequisite_bindings"] == task["prerequisite_bindings"]
     assert set(payload["vehicle"]["roles"]) == {"tyre"}
     assert len(wire_json(payload)) < 12000
+    for name, prefix in (("linkage_motion", "Closed contacts:"), ("clone(source", "Clone subassemblies")):
+        index = next(i for i, item in enumerate(context_guide()["workflow"]) if name in item)
+        assert payload["workflow"][index].startswith(prefix)
+        assert f"guide:/workflow/{index}" in payload["workflow"][index]
     assert tools.call("context", dict(resource="vehicle_context:/roles/seat/example_ids/9999"))["result"]["text"] == "seat"
     assert tools.call("context", dict(resource="vehicle_context:/specifications/measurements/length"))["result"]["text"] == "4140"
     assert context["roles"]["seat"]["example_ids"] == ["seat"] * 10000

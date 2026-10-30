@@ -67,7 +67,7 @@ def progress(observations, revision):
 
 def action_progress(observations, revision):
     """Retain real mutation IDs and explicit lifecycle actions without executing them."""
-    actions, check, motion, preview, exported = [], None, None, None, False
+    actions, check, motion, linkage_motion, preview, exported = [], None, None, None, None, False
     for step, record in observations.items():
         if not record.get("ok"):
             continue
@@ -85,12 +85,14 @@ def action_progress(observations, revision):
                 check = result.get("status", "unverified")
             elif tool == "motion":
                 motion = result.get("status", "unverified")
+            elif tool == "linkage_motion":
+                linkage_motion = result.get("status", "unverified")
             elif tool == "preview":
                 preview = result.get("status", "unverified")
             elif tool == "export":
                 exported = True
     return dict(revision=revision, mutations=actions[-3:], omitted_mutations=max(0, len(actions) - 3),
-        check=check, motion=motion, preview=preview, exported=exported,
+        check=check, motion=motion, linkage_motion=linkage_motion, preview=preview, exported=exported,
         guidance="These are executed actions, not acceptance. Recheck after edits; inspect actual preview, "
             "repair observed failures, export the current revision, then explicitly request finish. "
             "Source placements and instance counts alone do not establish completion.")

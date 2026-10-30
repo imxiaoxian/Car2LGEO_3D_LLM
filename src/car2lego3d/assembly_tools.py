@@ -44,6 +44,7 @@ TOOLS = {
     "candidate": "Measure and checkpoint an actually assembled module candidate. args: revision,module,label. Compare three distinct passing structures before finishing; text descriptions do not count.",
     "restore_candidate": "Restore a measured module trial when the surrounding assembly is unchanged. args: revision,module,candidate. Revision remains monotonic; checks must be repeated.",
     "motion": "Check at least nine positions per joint, all steering/suspension pairs and nested rolling/carrier pairs. args: samples=9. Other joint combinations and physical behavior remain unverified.",
+    "linkage_motion": "Read-only closed-contact kinematics. args: driver (revolute joint), passive (1..8 distinct revolute joints), optional rolling (1..4 rolling joints), samples=9,max_evaluations=2000 (total residual calls). SciPy solves passive angles within limits, preserving every neutral native contact and axial insertion; each pose needs native collision/connectivity checks and full passive constraint rank. Each requested rolling joint is swept across every solved driver pose (maximum 2000 combined poses); other joints neutral. Saves linkage-motion.json separately from motion.json; sampled digital geometry does not prove force transmission or physical behavior.",
     "render": "Export actual part-geometry GLB using the same resolver. args: none. No invented geometry.",
     "preview": "Render six whole-object views of current resolved native parts into a source-bound contact sheet. args: none. Vision planners receive the sheet in the next decision. Missing geometry/colours block preview; images are not an appearance pass.",
     "export": "Write nested MPD, flat LDR, IO, BOM, assembly steps and checks. args: none. Export does not certify appearance.",
@@ -639,6 +640,23 @@ class AssemblyTools:
                 report["status"] = "fail"
         report.update(self.verification_inputs())
         write_json(self.directory / "motion.json", report)
+        return report
+
+    def tool_linkage_motion(self, driver, passive, samples=9, max_evaluations=2000, rolling=None):
+        from .assembly_linkage import evaluate_linkage
+        from .assembly_evidence import files_current, snapshot_files
+        validate(self.assembly.graph(), self.catalog, collision_limit=10)
+        inputs = self.verification_inputs()
+        inputs["evidence_files"] = snapshot_files([*(item["file"] for item in inputs["evidence_files"]),
+            *(Path(__file__).with_name(name) for name in ("assembly_tools.py", "assembly_linkage.py",
+                "assembly_motion.py", "assembly_catalog.py", "native_ports.py", "assembly_graph.py",
+                "part_library.py", "assembly_evidence.py"))])
+        report = evaluate_linkage(self.assembly.graph(), self.catalog, driver, passive,
+            samples, max_evaluations, rolling=rolling, checkpoint=self.checkpoint)
+        report.update(inputs)
+        if not files_current(inputs["evidence_files"]):
+            report.update(status="unverified", issue="evidence_changed_during_evaluation")
+        write_json(self.directory / "linkage-motion.json", report)
         return report
 
     def tool_render(self):

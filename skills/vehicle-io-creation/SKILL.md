@@ -46,6 +46,20 @@ outside, limits and purpose. The same operation works inside `build` using earli
 Keep the fixed support outside the moving subtree. Rotations use degrees; rolling spans 360.
 Run `motion(samples>=9)` afterward: a joint declaration alone does not verify motion.
 
+For a closed-contact mechanism such as a steering tie bar, use `linkage_motion`
+with one declared revolute `driver` and 1..8 distinct revolute `passive` joints.
+All limits must include neutral. The host solves passive angles within their
+limits while preserving every original native contact and observed insertion.
+It requires full passive constraint rank and checks native connectivity and
+collisions at every solved pose. Optional `rolling` (1..4 rolling joints) sweeps
+each requested wheel at every solved driver pose; other rolling joints stay
+neutral, with at most 2000 combined poses. The total residual evaluation budget
+defaults to 2000. Missing evidence, a free passive joint or budget exhaustion
+remains unverified. Read `linkage-motion.json` separately from `motion.json`:
+this diagnostic does not replace ordinary motion, role review or the whole-car
+completion gate. Sampled contact closure does not prove continuous motion,
+force transmission, physical retention or load capacity.
+
 Axle seating has an axial interval, not a single socket centre. Snap maximizes legal overlap
 and prefers the initial axial position when overlap ties. Use queried port lengths, stops and
 native bounds to seed a suitable axial position in the local matrix before attach/snap.

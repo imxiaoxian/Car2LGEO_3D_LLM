@@ -106,3 +106,11 @@ def test_build_signature_memory_waits_for_complete_pages():
     assert pointer not in progress(records, 0)["signatures"]
     records["1"] = page(pointer, "def", offset=3, total=6)
     assert progress(records, 0)["signatures"][pointer] == "abcdef"
+
+
+def test_closed_linkage_report_does_not_replace_ordinary_motion():
+    records = {"0": dict(tool="motion", ok=True, revision_after=1, result=dict(status="fail")),
+        "1": dict(tool="linkage_motion", ok=True, revision_after=1, result=dict(status="pass"))}
+    current = action_progress(records, 1)
+    assert current["motion"] == "fail" and current["linkage_motion"] == "pass"
+    assert action_progress(records, 2)["linkage_motion"] is None
