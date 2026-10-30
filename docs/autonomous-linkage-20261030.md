@@ -85,3 +85,60 @@ existing native fixture. The rule now requires actual nonmoving frame parts,
 keeps the native layout check and checks those parts remain fixed throughout
 the linkage poses. The next seven-case run passed in 225.71 seconds; the full
 regression additionally covers the vertical-kingpin rule.
+
+## Measured live trial v1
+
+The empty-scene run in `autonomous-linkage-live-v1` stopped after
+2,400.656 seconds with `time_budget_exhausted`. It executed 66 tool actions,
+selected 27 native parts with the required search/query ordering and reported
+no planner execution errors. `planner_linkage_diagnostic_pass` is **false**.
+Execution sources remained unchanged throughout this run.
+
+At revision 12, eight nonneutral linkage poses lost contact while the passive
+angles remained zero (`driver_coupling_not_established`). The planner then
+rebuilt the tie bar under a moving carrier and articulated it again. Both
+subsequent linkage checks at revision 14 retained all original contacts and
+solved the passive angles, but four of nine steering poses still collided.
+The negative-limit pose collided between a front tyre and a fixed frame
+member. Thus the initial coupling issue is not the final failure diagnosis.
+
+The final ordinary motion report is `fail` at revision 11 and is stale for
+revision 14. The final static report is also stale. No combined rolling
+scan, preview pixels, current IO export or archive roundtrip completed.
+No autonomous, vehicle, appearance or physical success is claimed.
+
+| Preserved v1 evidence | SHA256 |
+| --- | --- |
+| Execution sources | `c90f005ab4dff6d84167afcebe01d56942d6b49fa003a641f61b34980c743ec6` |
+| Planner input | `122e64a8ccc257586a4c9d8553dac07b51e7d6476607fc436c038a9d430ff5e9` |
+| `report.json` | `00953db9349760cba1786bf8d104a715944b1d0a12dddb23399af93666702947` |
+| Final `assembly/linkage-motion.json` | `9dd2ae1731b842a4450ad52465b1af312df71232d9cbdd5eb80cac80f23bb567` |
+| `assembly/agent-decisions.jsonl` | `35b41a666c6e8617df201345c1bb1fd03a7fa6a668c73ed2bc305cd4d3851b91` |
+
+## Context repair and independent rerun
+
+Context version `assembly-context.v23` retains the full current joint table
+even when instances are truncated. Compact persistent evidence now includes
+host module-task failures, linkage contact losses, failed poses and collision
+pairs, with pointers to full observations and explicit omission counts.
+Revision matches do not certify native-dependency freshness. Ordinary motion,
+closed-contact linkage and whole-car acceptance remain separate.
+
+Eleven new mechanism-context regressions failed before this repair and passed
+afterward. The focused agent, inspection, vehicle-context and codec suite
+passed 79 tests in 4.86 seconds, retaining the existing 12,000-character
+vehicle-context limit. This software regression is not a live assembly pass.
+
+The complete regression for these repaired sources passed **1,293 tests**,
+with 14 warnings in 631.29 seconds. The preserved log is
+`runs/mechanism-context-regression-20261030.log`. The frontend production
+build also passed in `.next-mechanism-context-20261030`, with its log at
+`runs/mechanism-context-frontend-build-20261030.log`; existing services were
+not switched. All 106 historical file hashes and LDraw/BOM totals verified.
+
+The independent empty-scene rerun uses `autonomous-linkage-live-v2`, the same
+2,400-second/140-step budget and no injected fixture plan. Its execution hash
+is `40a60c4b397fe5ece0cec76f671430dad1d3f61e950ab2ae09d4287810226090`;
+its input hash is `27281d1f848f0d1994f861d18df52200c7fa7b7c5ceb89853048576125eec76d`.
+Execution sources are frozen until the run ends. Its measured result will be
+recorded separately; v1 and deterministic-fixture labels are preserved.

@@ -47,6 +47,22 @@ def inspect_module(tools, identity):
         semantic_tag_status="unverified", connector_validation="check_required_after_graft")
 
 
+def _linkage_pose_summary(poses):
+    failures = [pose for pose in poses if pose.get("status") != "pass"]
+    rows = []
+    for pose in failures[:12]:
+        contacts = pose.get("lost_contacts", [])
+        check = pose.get("check", {})
+        collisions = check.get("collisions", [])
+        rows.append(dict({key: pose[key] for key in (
+            "positions", "status", "converged", "residual_max", "passive_rank") if key in pose},
+            lost_contacts=contacts[:12], lost_contacts_omitted=max(0, len(contacts)-12),
+            check_status=check.get("status"), collision_pairs=collisions[:12],
+            collision_pairs_omitted=max(0, len(collisions)-12)))
+    return dict(pose_count=len(poses), failing_poses=rows,
+                failing_poses_omitted=max(0, len(failures)-12))
+
+
 def planning_evidence(observations, revision=None):
     """Keep useful observations addressable across the stateless CLI decisions."""
     parts, modules, searches, part_searches, diagnostics = {}, {}, {}, {}, {}
@@ -114,5 +130,32 @@ def planning_evidence(observations, revision=None):
                     range_issues=row.get("range_issues", []),
                     failing_poses=[p["value"] for p in row["poses"] if p["status"] != "pass"])
                     for row in result["joints"]], full_resource="observations", pointer="/" + str(step), summary_only=True)
+        elif tool == "linkage_motion":
+            diagnostics["linkage_motion"] = dict(
+                {key: result[key] for key in ("revision", "status", "driver", "passive", "rolling",
+                    "issue", "neutral_status", "residual_evaluations", "driver_requires_passive_response")
+                    if key in result}, step=step,
+                current=revision == result.get("revision") if revision is not None else None,
+                evidence_current="recheck_native_dependencies_before_acceptance",
+                **_linkage_pose_summary(result.get("poses", [])),
+                combined=[dict(rolling=row["rolling"], **_linkage_pose_summary(row.get("poses", [])))
+                          for row in result.get("combined", [])],
+                full_resource="observations", pointer="/" + str(step) + "/result", summary_only=True)
+        elif tool == "module_progress" and isinstance(result.get("module_task"), dict):
+            task = result["module_task"]
+            summary = dict({key: task[key] for key in (
+                "module", "status", "ordinary_motion_status", "vehicle_completion_ready",
+                "appearance", "studio", "physical") if key in task}, step=step,
+                revision=observation.get("revision_after"),
+                revision_matches=revision == observation.get("revision_after") if revision is not None else None,
+                evidence_current="recheck_native_dependencies_before_acceptance",
+                full_resource="observations", pointer="/" + str(step) + "/result/module_task", summary_only=True)
+            for field in ("issues", "failures"):
+                items = task.get(field, [])
+                summary.update({field: items[:12], field + "_omitted": max(0, len(items)-12)})
+            if isinstance(task.get("candidates"), dict):
+                summary["candidates"] = {key: task["candidates"][key] for key in (
+                    "status", "required", "passing", "selected", "reason") if key in task["candidates"]}
+            diagnostics["module_task"] = summary
     return dict(parts=parts, modules=modules, retrievals=searches, part_searches=part_searches,
                 diagnostics=diagnostics, mount_searches=mount_searches, context_pages=list(pages.values()))

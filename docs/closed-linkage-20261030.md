@@ -135,3 +135,34 @@ rolling, force transmission, axial retention, load capacity, physical assembly
 order, Studio GUI acceptance, whole-car appearance and arbitrary-object
 generation remain unverified. A fixture pass cannot be used as a training label
 for successful autonomous planning.
+
+The empty-scene live-planner entrypoint and its eight native validator
+regressions are documented in
+[autonomous-linkage-20261030.md](autonomous-linkage-20261030.md).
+That validator's fixture tests remain separate from the measured planner
+result and never change the whole-car completion gate.
+
+## Context-v23 fixture rerun
+
+`runs/car-modules-20261030/linkage-chassis-native-v5/` repeats the complete
+deterministic chassis probe after the mechanism-context repair. It exits 0
+with `probe_pass=true`, 33 native parts, 38 original contact pairs and zero
+neutral collisions. All nine steering poses and all 324 individual-wheel
+combined poses pass. Both front wheel axes change by 30 degrees; rear wheels
+remain stationary during steering. The current linkage evidence, unchanged
+execution/probe sources and IO archive graph roundtrip all pass.
+
+The actual new six-view contact sheet was opened and inspected. The frame,
+four tyres, rims and axles are visible and fully framed. The tyres are blue;
+color fidelity and vehicle appearance remain unverified. There is no body.
+This deterministic fixture is not the autonomous live-v2 result, does not
+replace ordinary motion and does not establish physical acceptance.
+
+| Preserved v5 evidence | SHA256 |
+| --- | --- |
+| Execution sources | `40a60c4b397fe5ece0cec76f671430dad1d3f61e950ab2ae09d4287810226090` |
+| `probe-summary.json` | `9487ae9b4e500b7449c755dd6601aadac4e9683855d653427c7bcd9ea1812064` |
+| `linkage-motion.json` | `f74a2b2e182f0da225e147091b342ba19b2579067b6bf75a2214295138b90234` |
+| `checks.json` | `fe2700eedcd292dd98e2538d16491926c9e838e6f4142827dd6f2595316622cc` |
+| `model.io` | `647c9e4d550bc979924e30d914fcd3b6ba22da9fb69d58d6e3a8c4fab63dba88` |
+| Six-view contact sheet | `267beaf44ba316cb0dc54daa2de2835aef7df11ee471fa63e198d330a098cc33` |

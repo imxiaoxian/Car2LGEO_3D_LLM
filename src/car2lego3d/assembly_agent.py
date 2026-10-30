@@ -58,7 +58,7 @@ def wire_json(value):
 
 
 DECISION_TOKENS = 256
-CONTEXT_VERSION = "assembly-context.v22"
+CONTEXT_VERSION = "assembly-context.v23"
 
 
 def planner_context_contract(backend, *, shared_text=False):
@@ -454,7 +454,8 @@ class AssemblyAgent:
                 image_inputs=[scoped_vehicle["contact_sheet"], *payload.get("image_inputs", [])],
                 recent_history=[self.history_summary(record) for record in list(history)[-4:]],
                 graph_summary=dict(bom=self.tools.assembly.bom(),
-                    instances=graph["instances"][-100:], omitted_instances=max(0, len(graph["instances"])-100)))
+                    instances=graph["instances"][-100:], joints=graph["joints"],
+                    omitted_instances=max(0, len(graph["instances"])-100)))
             payload["action_progress"] = action_progress(self.tools.context_resources["observations"], graph["revision"])
             for record in reversed(history):
                 if record["decision"]["tool"] == "view_reference" and record["observation"]["ok"]:
@@ -477,8 +478,11 @@ class AssemblyAgent:
                 known_evidence=planning_evidence(self.tools.context_resources["observations"], graph["revision"]),
                 action_progress=action_progress(self.tools.context_resources["observations"], graph["revision"]),
                 graph_summary=dict(bom=self.tools.assembly.bom(), instances=graph["instances"][-100:],
-                    omitted_instances=max(0, len(graph["instances"]) - 100)),
+                    joints=graph["joints"], omitted_instances=max(0, len(graph["instances"]) - 100)),
                 assembly_guidance="Build a grounded connected subassembly with observed native connectors. "
+                    "graph_summary.joints retains all current joint IDs, axes, pivots and limits. "
+                    "Use known_evidence.diagnostics.module_task and linkage_motion for remaining issues and failed contacts; "
+                    "revision matches alone do not certify native evidence freshness. "
                     "Use build to combine module/add/attach/snap operations and @aliases in one atomic revision. "
                     "@aliases exist only within that build call; use the returned real instance IDs in later calls, "
                     "and inspect the graph when an ID is missing. If build succeeded and action_progress lists its "
