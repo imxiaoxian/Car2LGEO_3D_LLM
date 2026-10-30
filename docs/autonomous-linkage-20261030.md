@@ -136,9 +136,71 @@ build also passed in `.next-mechanism-context-20261030`, with its log at
 `runs/mechanism-context-frontend-build-20261030.log`; existing services were
 not switched. All 106 historical file hashes and LDraw/BOM totals verified.
 
+Implementation commit `2a755f9e5532dbfae47c86b263d55a346e96e1fa` also
+passed both GitHub CI runs: PR run `41001625305` and branch run
+`41001620695`. Their Python regression, historical-example verification and
+frontend build jobs completed successfully. Native-library-dependent cases
+still require the separate local run documented above.
+
 The independent empty-scene rerun uses `autonomous-linkage-live-v2`, the same
 2,400-second/140-step budget and no injected fixture plan. Its execution hash
 is `40a60c4b397fe5ece0cec76f671430dad1d3f61e950ab2ae09d4287810226090`;
 its input hash is `27281d1f848f0d1994f861d18df52200c7fa7b7c5ceb89853048576125eec76d`.
-Execution sources are frozen until the run ends. Its measured result will be
-recorded separately; v1 and deterministic-fixture labels are preserved.
+Execution sources stayed frozen until the run ended. The measured result is
+recorded below; v1 and deterministic-fixture labels are preserved.
+
+## Measured live trial v2
+
+The independent empty-scene run completed in **2,068.890 seconds**, within the
+same 2,400-second/140-step budget. It executed 59 planner actions and explicitly
+finished at revision 13. `planner_linkage_diagnostic_pass=true`; the report has
+no planner execution errors, no unrecovered errors and unchanged execution and
+probe sources. This is one measured successful trial, not a reliability estimate.
+
+The planner selected six native part types through description searches and
+queries before first placement, then assembled 20 parts and seven revolute
+joints. It chose an open-centre frame, steering arms and a tie beam, rather than
+receiving the deterministic fixture's graph, placements or operation sequence.
+The observations establish selection ordering, not unseen-part generalization.
+
+- Final static native check: pass, zero neutral collisions, 20 original native
+  contact pairs. All nine solved steering poses and all 324 individually rolling
+  combinations pass, retaining every original contact and insertion offset.
+- The solve uses 249 residual evaluations. The actual front wheel axes turn
+  approximately 30 degrees; rear wheels and the fixed frame stay still during
+  steering. All four rims, tyres and axles show geometric rolling response.
+- Neutral layout passes with a 120 LDU wheelbase, 180 LDU track and common ground
+  Y=9.912 LDU. The fixed frame bottom is Y=4 LDU, above ground in LDraw coordinates.
+- Ordinary `motion(samples=9)` independently passes at the same revision 13.
+  It remains a separate report from the closed-contact linkage scan.
+- The current six-view preview pixels reached planner steps 57 and 58. The
+  planner described the visible chassis and tie beam, exported revision 13 and
+  explicitly finished. The resulting IO archive roundtrips to the same graph.
+
+The intermediate failures remain in the original trajectory. Revision 11's
+linkage failed; revision 12 repaired it and passed linkage, but ordinary motion
+still collided when the passive front carrier moved independently to 45 degrees.
+The planner changed that carrier's limits from [-45,45] to [-30,30], then reran
+the static, linkage and ordinary-motion checks at revision 13. The required
+driver span of -30 to +30 degrees was retained; no 45-degree pass is claimed.
+
+The actual final contact sheet was also opened and inspected outside the
+planner: four tyres, rims, frame and tie beam are visible and fully framed.
+The BOM encodes black tyres (0) and light-bluish-gray structures/rims (71), but
+the preview shows blue tyres and pale structures. Color fidelity and appearance
+remain unverified; there is no body. `vehicle_completion_ready=false`, and
+Studio GUI, axial retention, force transmission, load capacity, continuous
+motion, simultaneous multi-wheel rolling and physical acceptance remain
+unverified. This diagnostic is not whole-car completion or an accepted whole-car
+training example.
+
+| Preserved v2 evidence | SHA256 |
+| --- | --- |
+| `report.json` | `70dd74b2ac0060439ae2d03469eac862b7cf3adef6f9f1f326034d4fb64a972e` |
+| `assembly/checks.json` | `a883745245765c9081dbaa9fc26ee72cc9574d952b15bdf8fbd7ba1961a9dbdc` |
+| `assembly/motion.json` | `8a654dc70bebee4bd75411b12a1de0337617f165b92ca127b97c4afc74b86d86` |
+| `assembly/linkage-motion.json` | `8e5938ede8535e1b2bcb4acdfbecd26cc5607295d27fadb90bb5b56a7d1a3dbd` |
+| `assembly/model.io` | `119943ad43187b0c47d1ef89dc651660e35d690cdb951e3e03d0d1b8c00dedbd` |
+| `assembly/agent-decisions.jsonl` | `38734263bb5d2b048626898d798a383115d0b153cbf96b7a4d10a8a7c54892c8` |
+| `assembly/trajectory.jsonl` | `e0b5be62eeb3cf3f8c6f36fdafde3b248f51ea0198b43ad3b8276406edbffd3c` |
+| Six-view contact sheet | `ede0135bbbfda08a2efd5251a39da4b6f2bd9277894d8e355b9bf731dc876169` |

@@ -129,8 +129,9 @@ frontend/API services remain on their previous build. All 106 recorded example
 hashes and LDraw/BOM totals verified. The frontend log is
 `runs/linkage-frontend-build-20261030.log`.
 
-The next mechanical milestone is a live planner linked-steering/chassis trial
-using these tools. Continuous intermediate poses, simultaneous multi-wheel
+The next mechanical milestone at this fixture stage was a live planner
+linked-steering/chassis trial using these tools; its measured results are
+recorded below. Continuous intermediate poses, simultaneous multi-wheel
 rolling, force transmission, axial retention, load capacity, physical assembly
 order, Studio GUI acceptance, whole-car appearance and arbitrary-object
 generation remain unverified. A fixture pass cannot be used as a training label
@@ -166,3 +167,19 @@ replace ordinary motion and does not establish physical acceptance.
 | `checks.json` | `fe2700eedcd292dd98e2538d16491926c9e838e6f4142827dd6f2595316622cc` |
 | `model.io` | `647c9e4d550bc979924e30d914fcd3b6ba22da9fb69d58d6e3a8c4fab63dba88` |
 | Six-view contact sheet | `267beaf44ba316cb0dc54daa2de2835aef7df11ee471fa63e198d330a098cc33` |
+
+## Subsequent autonomous trial
+
+The separate empty-scene `autonomous-linkage-live-v2` trial now passes its
+scoped planner diagnostic: 20 self-selected native parts, seven joints, 20
+original contacts, nine linked-steering poses and 324 individual-wheel combined
+poses. Final revision 13 also passes ordinary motion, current preview feedback,
+export and IO graph roundtrip; sources remained unchanged. The planner repaired
+an intermediate independent 45-degree carrier collision by setting its passive
+limits to [-30,30], preserving the required driver range. The measured report,
+hashes and original failed v1/intermediate evidence are documented in
+[autonomous-linkage-20261030.md](autonomous-linkage-20261030.md).
+
+This successful trial does not relabel the deterministic fixture, establish
+planner reliability, certify the preview's colors or complete a whole car.
+The physical and whole-car limitations above still apply.

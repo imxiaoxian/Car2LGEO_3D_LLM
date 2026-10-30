@@ -6,6 +6,10 @@
 
 BrickWright、BrickBench/BrickAgent、LEGO Forge 的源码对照、连接点安装工具和独立装配复核见 [开源装配参考](docs/open-source-assembly-references.md)。
 
+两套路线的架构取舍与同输入比较方法见 [两套方案分析](docs/two-pipeline-analysis-20261029.md)。[SKY-001 核验](docs/skyfall-sky001-research.md) 记录其公开能力和接入边界；当前采用分层规划思路，尚未将其注册为可用模型后端。
+
+汽车模块的真实执行证据分别记录在 [转向轮模块](docs/car-modules-20261030.md)、[闭环联动工具与确定性夹具](docs/closed-linkage-20261030.md) 和 [空场景自主联动试验](docs/autonomous-linkage-20261030.md)。软件回归、确定性夹具与自主试验保留各自结论，不据此宣称整车通过。
+
 ## 生成链路
 
 1. 输入品牌、型号和选填年款，通过大模型对话获取车型尺寸估计、外观和配置；未知项保留为空并记录置信度。
