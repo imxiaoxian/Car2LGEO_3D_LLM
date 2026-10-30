@@ -162,9 +162,8 @@ class Web3DLegoPipeline:
                 "style": style,
                 "total_parts": len(assembly.parts),
                 "instruction_steps": len(instructions.steps),
-                "estimated_build_time_minutes": instructions.estimated_time_minutes,
-                "bom_unique_parts": len(instructions.bom),
-                "confidence_score": instructions.confidence_score,
+                "difficulty": instructions.difficulty,
+                "estimated_build_time_minutes": instructions.estimated_build_time_minutes,
                 "validation_score": validation_report.structural_score,
                 "validation_issues": len(validation_report.issues),
                 "llm_model": self.llm_generator.model,
@@ -299,17 +298,7 @@ try:
     from pydantic import BaseModel
 
     app = FastAPI(title="Web 3D LEGO Generator API", version="1.0.0")
-
-    # Built on first request, not at import: constructing it reads credentials,
-    # so an import-time instance makes this module unimportable without an API
-    # key, which breaks tests and any code that only wants the data classes.
-    _pipeline: "Web3DLegoPipeline | None" = None
-
-    def get_pipeline() -> "Web3DLegoPipeline":
-        global _pipeline
-        if _pipeline is None:
-            _pipeline = Web3DLegoPipeline()
-        return _pipeline
+    pipeline = Web3DLegoPipeline()
 
     class GenerationRequest(BaseModel):
         description: str
@@ -322,7 +311,7 @@ try:
     @app.post("/api/generate")
     async def generate_model(request: GenerationRequest):
         """Generate LEGO model from description"""
-        result = get_pipeline().generate_from_description(
+        result = pipeline.generate_from_description(
             description=request.description,
             category=request.category,
             style=request.style,
@@ -346,7 +335,7 @@ try:
     @app.get("/api/download/{format}/{filename}")
     async def download_file(format: str, filename: str):
         """Download generated file"""
-        filepath = get_pipeline().output_dir / filename
+        filepath = pipeline.output_dir / filename
         if not filepath.exists():
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(filepath)
