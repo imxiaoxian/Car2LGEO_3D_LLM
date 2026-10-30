@@ -79,15 +79,17 @@ class BoundingBox:
     min: Vector3
     max: Vector3
 
-    def intersects(self, other: 'BoundingBox', tolerance: float = 0.1) -> bool:
-        """Check if this AABB intersects with another"""
-        return not (
-            self.max.x + tolerance < other.min.x or
-            self.max.y + tolerance < other.min.y or
-            self.max.z + tolerance < other.min.z or
-            self.min.x - tolerance > other.max.x or
-            self.min.y - tolerance > other.max.y or
-            self.min.z - tolerance > other.max.z
+    def intersects(self, other: 'BoundingBox', tolerance: float = 0.01) -> bool:
+        """Check whether two boxes genuinely overlap.
+
+        Two bricks that merely touch (one ends exactly where the next begins)
+        are correctly joined, not colliding, so the overlap must exceed
+        ``tolerance`` on all three axes before this reports True.
+        """
+        return (
+            self.min.x + tolerance < other.max.x and other.min.x + tolerance < self.max.x and
+            self.min.y + tolerance < other.max.y and other.min.y + tolerance < self.max.y and
+            self.min.z + tolerance < other.max.z and other.min.z + tolerance < self.max.z
         )
 
     def contains_point(self, point: Vector3, tolerance: float = 0.01) -> bool:
@@ -299,13 +301,49 @@ class Assembly:
         return {
             "name": self.name,
             "parts": [p.to_dict() for p in self.parts],
-            "instructions": self.instructions.to_dict(),
+            "instructions": self.instructions.to_dict() if self.instructions else None,
             "created_at": self.created_at,
             "metadata": self.metadata
         }
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2)
+
+    def save_to_file(self, path) -> None:
+        """Write the assembly to disk as JSON."""
+        from pathlib import Path
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(self.to_json(), encoding="utf-8")
+
+    @staticmethod
+    def load_from_file(path) -> 'Assembly':
+        """Read an assembly written by save_to_file."""
+        from pathlib import Path
+        return Assembly.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+    @staticmethod
+    def from_dict(d: dict) -> 'Assembly':
+        parts = []
+        for part_data in d.get("parts", []):
+            brick = BrickLibrary.get_brick(part_data["brick_id"])
+            if brick is None:
+                brick = BrickLibrary.get_brick("3001")
+            parts.append(PlacedPart(
+                instance_id=part_data["instance_id"],
+                brick_definition=brick,
+                position=Vector3.from_list(part_data["position"]),
+                rotation=Vector3.from_list(part_data["rotation"]),
+                color=part_data["color"],
+                connected_to=part_data.get("connected_to", []),
+            ))
+        return Assembly(
+            name=d["name"],
+            parts=parts,
+            instructions=(AssemblyInstructions.from_dict(d["instructions"])
+                          if d.get("instructions") else None),
+            created_at=d.get("created_at", datetime.now().isoformat()),
+            metadata=d.get("metadata", {}),
+        )
 
     def get_statistics(self) -> 'AssemblyStatistics':
         """Calculate assembly statistics"""
@@ -478,9 +516,9 @@ class BrickLibrary:
     STANDARD_BRICKS = {
         "3003": LEGOBrick(
             lego_id="3003",
-            name="Brick 1x2",
+            name="Brick 2x2",
             category=BrickCategory.BRICK,
-            dimensions=Vector3(1, 1, 2),
+            dimensions=Vector3(2, 1.2, 2),
             mass_grams=2.4,
             connectors=[
                 BrickConnector(ConnectionType.STUD, Vector3(0, 0.5, 0), Vector3(0, 1, 0), "male", 1.0),
@@ -492,9 +530,9 @@ class BrickLibrary:
         ),
         "3001": LEGOBrick(
             lego_id="3001",
-            name="Brick 2x2",
+            name="Brick 2x4",
             category=BrickCategory.BRICK,
-            dimensions=Vector3(2, 1, 2),
+            dimensions=Vector3(4, 1.2, 2),
             mass_grams=3.2,
             connectors=[
                 BrickConnector(ConnectionType.STUD, Vector3(-0.5, 0.5, -0.5), Vector3(0, 1, 0), "male"),
@@ -506,9 +544,9 @@ class BrickLibrary:
         ),
         "3002": LEGOBrick(
             lego_id="3002",
-            name="Brick 2x4",
+            name="Brick 2x3",
             category=BrickCategory.BRICK,
-            dimensions=Vector3(2, 1, 4),
+            dimensions=Vector3(3, 1.2, 2),
             mass_grams=4.6,
             official_colors=["Bright Red", "Bright Blue", "Bright Yellow", "Black", "White", "Dark Gray"]
         ),
@@ -528,7 +566,83 @@ class BrickLibrary:
     @classmethod
     def get_brick(cls, lego_id: str) -> Optional[LEGOBrick]:
         """Get brick definition by ID"""
-        return cls.STANDARD_BRICKS.get(lego_id)
+        part = str(lego_id).strip().lower()
+        if part in cls.STANDARD_BRICKS:
+            return cls.STANDARD_BRICKS[part]
+        return None
+
+    @classmethod
+    def resolve_brick(cls, lego_id: str, catalogue=None) -> Optional[LEGOBrick]:
+        """Resolve a brick, deriving a definition for real LDraw parts.
+
+        The hand-written table only covers a handful of shapes, but reference
+        models use hundreds of distinct parts. When a part exists in the LDraw
+        library we synthesise a definition from its measured geometry so the
+        rest of the pipeline (stud-based collision, export) keeps working.
+        """
+        part = str(lego_id).strip().lower()
+        known = cls.STANDARD_BRICKS.get(part)
+        if known is not None:
+            return known
+        if catalogue is not None and not catalogue.has(part):
+            return None
+        derived = cls._derived.get(part)
+        if derived is not None:
+            return derived
+        derived = cls._derive_from_ldraw(part)
+        if derived is not None:
+            cls._derived[part] = derived
+        return derived
+
+    # Dimensions are cached per part ID; deriving one walks the LDraw file.
+    _derived: Dict[str, LEGOBrick] = {}
+
+    @classmethod
+    def _derive_from_ldraw(cls, part: str) -> Optional[LEGOBrick]:
+        """Measure an LDraw part and express it in stud units."""
+        try:
+            from .ldraw_catalogue import load_catalogue
+            from .part_library import PartLibrary
+        except Exception:
+            return None
+        catalogue = load_catalogue()
+        root = next((r for r in catalogue.roots if (r / "parts").is_dir()), None)
+        if root is None:
+            return None
+        try:
+            library = PartLibrary(root)
+            triangles, _ = library.triangles(part + ".dat")
+        except Exception:
+            return None
+        if triangles is None or len(triangles) == 0:
+            return None
+        points = triangles.reshape(-1, 3)
+        lo = points.min(axis=0)
+        hi = points.max(axis=0)
+        # LDraw LDU: 20 LDU per stud, 24 LDU per brick height.
+        studs = (hi - lo) / 20.0
+        width = max(studs[0], 0.1)
+        depth = max(studs[2], 0.1)
+        height = max(studs[1], 0.1) * 20.0 / 24.0
+        category = BrickCategory.OTHER
+        # Measured LDraw bounding boxes: a plate sits near 0.4-0.6 studs tall,
+        # a standard brick near 1.2-1.4. The gap leaves room for lips and trim.
+        if height <= 0.6:
+            category = BrickCategory.PLATE
+            pitch = 0.4
+        elif height >= 0.85:
+            category = BrickCategory.BRICK
+            pitch = 1.2
+        else:
+            pitch = height
+        return LEGOBrick(
+            lego_id=part,
+            name=f"LDraw part {part.upper()}",
+            category=category,
+            dimensions=Vector3(width, pitch, depth),
+            mass_grams=round(max(0.4, width * depth * height * 0.9), 2),
+            official_colors=["Bright Red", "Black", "White", "Dark Gray"],
+        )
 
     @classmethod
     def list_bricks(cls) -> List[str]:
@@ -548,6 +662,34 @@ class BrickLibrary:
 class LDrawExporter:
     """Export Assembly to LDraw format"""
 
+    # LDraw standard colour codes
+    COLOR_CODES = {
+        "Bright Red": 4,
+        "Bright Blue": 1,
+        "Bright Yellow": 14,
+        "Black": 0,
+        "White": 15,
+        "Dark Gray": 8,
+        "Dark Bluish Gray": 72,
+        "Light Bluish Gray": 71,
+        "Bright Green": 2,
+        "Dark Green": 288,
+        "Tan": 19,
+        "Dark Tan": 28,
+        "Brown": 6,
+        "Reddish Brown": 70,
+        "Dark Orange": 484,
+        "Sand Green": 378,
+        "Trans-Clear": 47,
+        "Trans-Black": 40,
+        "Trans-Light Blue": 43,
+        "Trans-Red": 41,
+        "Trans-Yellow": 46,
+        "Flat Silver": 179,
+        "Pearl Gold": 297,
+        "Light Gray": 7,
+    }
+
     @staticmethod
     def export(assembly: Assembly) -> str:
         """Generate LDraw (.ldr) format string"""
@@ -557,20 +699,9 @@ class LDrawExporter:
         lines.append("0 Description: Auto-generated LEGO model")
         lines.append("")
 
-        # Color definitions (LDraw format uses specific color codes)
-        # This is simplified - real implementation needs full color mapping
-        color_map = {
-            "Bright Red": 16,
-            "Bright Blue": 1,
-            "Bright Yellow": 14,
-            "Black": 16,
-            "White": 15,
-            "Dark Gray": 8,
-        }
-
         # Part references
         for part in assembly.parts:
-            color_code = color_map.get(part.color, 16)
+            color_code = LDrawExporter.COLOR_CODES.get(part.color, 16)
 
             # LDraw command: 1 <color> <x> <y> <z> <a> <b> <c> <d> <e> <f> <g> <h> <i> <part>
             # (simplified 45-degree rotation matrix)

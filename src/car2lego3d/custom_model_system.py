@@ -402,11 +402,15 @@ class ModelDefinitionValidator:
 
         total_volume = width * height * depth
 
-        # Check reasonable bounds
+        # Check reasonable bounds. A standard modular building footprint is
+        # 32 x 32 studs, and figures reach ~30 studs tall, so the ceiling has to
+        # sit well above a single-storey house rather than at furniture scale.
         if total_volume < 8:
             result.add_warning("specifications.target_dimensions", "Model is very small (< 8 stud³)")
-        elif total_volume > 8000:
-            result.add_error("specifications.target_dimensions", "Model is too large (> 8000 stud³)")
+        elif total_volume > 150000:
+            result.add_error("specifications.target_dimensions", "Model is too large (> 150000 stud³)")
+        elif total_volume > 50000:
+            result.add_warning("specifications.target_dimensions", "Model is very large (> 50000 stud³); build time and part count grow quickly")
 
         # Check aspect ratios
         if max(width, depth) / min(width, depth) > 10:
