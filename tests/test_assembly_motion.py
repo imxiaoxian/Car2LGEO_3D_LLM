@@ -150,3 +150,80 @@ def test_final_checkpoint_prevents_cancelled_last_pose_returning_a_report():
     with pytest.raises(AssemblyCancelled):
         evaluate_motion(source, validate, checkpoint=checkpoint)
     assert len(validated) == 9
+
+
+def steerable_wheel():
+    source = graph()
+    # Joint ancestry comes from parent links, not occurrence-name prefixes.
+    source["instances"][1]["id"] = "wheel"
+    source["joints"] = {
+        "root/carrier": dict(type="revolute", axis=[0, 1, 0], origin=[0, 0, 0],
+                             limits=[-30, 30], purpose="steering"),
+        "wheel": dict(type="revolute", axis=[0, 0, 1], origin=[0, 0, 0],
+                      limits=[0, 360], purpose="rolling"),
+    }
+    return source
+
+
+@pytest.mark.parametrize("fault", ["collision", "detachment", "missing_geometry"])
+def test_nested_rolling_is_checked_while_steered(fault):
+    source = steerable_wheel()
+    before = deepcopy(source)
+
+    def validate(pose):
+        report = clear(pose)
+        world = np.asarray(pose["instances"][1]["world"])
+        if abs(world[2, 1]) > .2:
+            if fault == "collision":
+                report["collisions"] = [dict(a="wheel", b="frame")]
+            elif fault == "detachment":
+                report["gates"]["connections"] = "fail"
+            else:
+                report["unknown"] = ["missing collider"]
+        return report
+
+    result = evaluate_motion(source, validate)
+    assert all(p["status"] == "pass" for row in result["joints"] for p in row["poses"])
+    assert result["status"] == result["combined_joint_states"] == (
+        "unverified" if fault == "missing_geometry" else "fail")
+    assert result["combined"][0]["instances"] == ["root/carrier", "wheel"]
+    assert len(result["combined"][0]["poses"]) == 81
+    assert source == before
+
+
+def test_nested_suspension_rolling_and_steering_pairs_preserve_scope():
+    source = steerable_wheel()
+    source["instances"].append(dict(id="suspension", parent="root/carrier",
+                                   local=np.eye(4).tolist(), world=np.eye(4).tolist()))
+    source["instances"][1]["parent"] = "suspension"
+    source["joints"]["suspension"] = dict(type="prismatic", axis=[0, 1, 0],
+                                         limits=[0, 8], purpose="suspension")
+    result = evaluate_motion(source, clear)
+    assert {tuple(row["instances"]) for row in result["combined"]} == {
+        ("root/carrier", "suspension"), ("root/carrier", "wheel"), ("suspension", "wheel")}
+    assert result["status"] == "pass"
+    assert result["unsampled_multi_joint_combinations"] == "unverified"
+    assert all(len(row["poses"]) == 81 for row in result["combined"])
+
+
+def test_unrelated_wheel_does_not_add_nested_rolling_pairs():
+    source = steerable_wheel()
+    source["instances"][1]["parent"] = "root"
+    result = evaluate_motion(source, clear)
+    assert result["status"] == "pass"
+    assert result["combined_joint_states"] == "not_applicable"
+    assert not result["combined"]
+
+
+def test_checkpoint_interrupts_nested_rolling_combinations():
+    count = 0
+
+    def checkpoint():
+        nonlocal count
+        count += 1
+        if count == 20:
+            raise AssemblyCancelled("stop combined wheel sweep")
+
+    with pytest.raises(AssemblyCancelled):
+        evaluate_motion(steerable_wheel(), clear, checkpoint=checkpoint)
+    assert count == 20

@@ -43,7 +43,7 @@ TOOLS = {
     "module_progress": "Check required vehicle modules, actual role parts, interfaces, joints, current checks and independent role evidence. args: none. Missing evidence is unverified; draft export is always allowed.",
     "candidate": "Measure and checkpoint an actually assembled module candidate. args: revision,module,label. Compare three distinct passing structures before finishing; text descriptions do not count.",
     "restore_candidate": "Restore a measured module trial when the surrounding assembly is unchanged. args: revision,module,candidate. Revision remains monotonic; checks must be repeated.",
-    "motion": "Check at least nine positions of each declared joint. args: samples=9. Digital only.",
+    "motion": "Check at least nine positions per joint, all steering/suspension pairs and nested rolling/carrier pairs. args: samples=9. Other joint combinations and physical behavior remain unverified.",
     "render": "Export actual part-geometry GLB using the same resolver. args: none. No invented geometry.",
     "preview": "Render six whole-object views of current resolved native parts into a source-bound contact sheet. args: none. Vision planners receive the sheet in the next decision. Missing geometry/colours block preview; images are not an appearance pass.",
     "export": "Write nested MPD, flat LDR, IO, BOM, assembly steps and checks. args: none. Export does not certify appearance.",

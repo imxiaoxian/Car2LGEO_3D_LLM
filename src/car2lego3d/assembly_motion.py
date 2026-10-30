@@ -82,8 +82,23 @@ def evaluate_motion(graph, validate_pose, samples=9, *, checkpoint=None):
 
     steering = [name for name, joint in graph["joints"].items() if joint.get("purpose") == "steering"]
     suspension = [name for name, joint in graph["joints"].items() if joint.get("purpose") == "suspension"]
+    rolling = [name for name, joint in graph["joints"].items() if joint.get("purpose") == "rolling"]
+    parents = {node["id"]: node["parent"] for node in graph["instances"]}
+
+    def contains(ancestor, child):
+        seen = set()
+        while child in parents and child not in seen:
+            seen.add(child)
+            child = parents[child]
+            if child == ancestor:
+                return True
+        return False
+
+    pairs = list(product(steering, suspension))
+    pairs.extend((carrier, wheel) for carrier, wheel in product(steering + suspension, rolling)
+                 if contains(carrier, wheel) or contains(wheel, carrier))
     combined = []
-    for a, b in product(steering, suspension):
+    for a, b in pairs:
         # Include refinement points discovered in the individual collision sweeps.
         values_a = next(row["poses"] for row in records if row["instance"] == a)
         values_b = next(row["poses"] for row in records if row["instance"] == b)
@@ -100,7 +115,7 @@ def evaluate_motion(graph, validate_pose, samples=9, *, checkpoint=None):
         if not statuses or "unverified" in statuses or unknown_purposes else "pass")
     if checkpoint:
         checkpoint()
-    return dict(schema="assembly-motion.v3", revision=graph["revision"], status=status, joints=records,
+    return dict(schema="assembly-motion.v4", revision=graph["revision"], status=status, joints=records,
         combined_joint_states=combined_status, combined=combined, unknown_joint_purposes=unknown_purposes,
-        scope="sampled_single_joints_and_all_steering_suspension_pairs_with_connectivity",
+        scope="sampled_single_joints_steering_suspension_and_nested_rolling_pairs_with_connectivity",
         unsampled_multi_joint_combinations="unverified", physical="unverified")
