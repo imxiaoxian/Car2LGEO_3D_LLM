@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 from threading import Lock, Thread
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from uuid import uuid4
 
 from .common import ROOT, write_json
@@ -234,14 +234,16 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def send_file(self, path):
+    def send_file(self, path, filename=None):
         if not path.is_file():
             raise FileNotFoundError(path)
         self.send_response(200)
         self.send_header("Content-Type", self.guess_type(str(path)))
         self.send_header("Content-Length", str(path.stat().st_size))
-        if path.suffix in {".io", ".glb", ".ldr", ".json"}:
-            self.send_header("Content-Disposition", f'attachment; filename="{path.name}"')
+        if filename or path.suffix in {".io", ".glb", ".ldr", ".json"}:
+            name = Path(filename).name if filename else path.name
+            fallback = name if name.isascii() and re.fullmatch(r"[a-zA-Z0-9_.-]+", name) else "model" + path.suffix
+            self.send_header("Content-Disposition", f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name)}")
         self.end_headers()
         with path.open("rb") as stream:
             self.copyfile(stream, self.wfile)

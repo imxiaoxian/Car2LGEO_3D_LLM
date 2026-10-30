@@ -60,11 +60,12 @@ export default function AssemblyViewer({ id, highlightedModule = "" }: { id: str
         if (!geometries[part.part_num]?.length) throw new Error(`缺少零件几何：${part.part_num}`);
         (geometries[part.part_num] || []).forEach((g,index) => {
           const c = g.color_id === 16 ? part.color_id : g.color_id;
+          const native = assembly.colors?.[c];
           const direct = c >= 0x2000000;
-          const transparent = (c >= 32 && c <= 47) || (c >= 0x3000000 && c < 0x4000000);
-          const paint = direct ? `#${(c & 0xffffff).toString(16).padStart(6,"0")}` : palette[c] || "#b9b9b9";
+          const transparent = native ? native[3] < 255 : (c >= 32 && c <= 47) || (c >= 0x3000000 && c < 0x4000000);
+          const paint = native ? `#${native.slice(0,3).map(value => value.toString(16).padStart(2,"0")).join("")}` : direct ? `#${(c & 0xffffff).toString(16).padStart(6,"0")}` : palette[c] || "#b9b9b9";
           const material = new THREE.MeshStandardMaterial({ color:paint, roughness:transparent ? .12 : .3, metalness:transparent ? 0 : c === 71 ? .18 : .03,
-            transparent, opacity:transparent ? (c === 40 ? .65 : c === 47 ? .35 : .7) : 1, depthWrite:!transparent, side:THREE.DoubleSide });
+            transparent, opacity:native ? native[3]/255 : transparent ? (c === 40 ? .65 : c === 47 ? .35 : .7) : 1, depthWrite:!transparent, side:THREE.DoubleSide });
           disposables.push(material); group.add(new THREE.Mesh(geometryCache.get(part.part_num)![index], material));
         });
         root.add(group);
@@ -100,7 +101,7 @@ export default function AssemblyViewer({ id, highlightedModule = "" }: { id: str
     model.current.children.forEach(group => {
       group.visible=Number(group.userData.step)<=step;
       group.matrix.copy(group.userData.original);
-      if (selected && affected.has(group.userData.module)) {
+      if (selected && (affected.has(group.userData.module) || group.name === selected.child)) {
         const pivot=new THREE.Vector3(...selected.pivot as [number,number,number]);
         const axis=new THREE.Vector3(...selected.axis as [number,number,number]);
         const move=new THREE.Matrix4();

@@ -5,6 +5,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from PIL import Image
+import numpy as np
 
 from .common import digest, stage
 from .ldraw_document import Document
@@ -27,6 +28,10 @@ def assembly_sequence(text):
             int(tokens[1])
             if not all(math.isfinite(float(value)) for value in tokens[2:14]):
                 raise ValueError("Non-finite LDraw transform.")
+            rotation = np.array(tokens[5:14], dtype=float).reshape(3, 3)
+            if (not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-5, rtol=0)
+                    or not np.isclose(np.linalg.det(rotation), 1, atol=1e-5, rtol=0)):
+                raise ValueError("Studio parts must use rigid transforms, without scaling or reflection.")
             sequence.append(tuple(tokens))
         elif tokens[0] != "0":
             raise ValueError("Only comments, steps and standard part references are supported.")
@@ -61,6 +66,12 @@ def export_studio(source, directory, thumbnail=None):
         content = source.read_text(encoding="utf-8")
         document = Document(content)
         count = len(document.instances())
+        from .bricklayer_audit import audit_ldraw
+        audit_source = directory / "bricklayer-input.ldr"
+        audit_source.write_text(document.flatten(), encoding="utf-8")
+        independent = audit_ldraw(audit_source, directory / "bricklayer-audit.json")
+        if independent["enforced"] and independent["status"] != "pass":
+            raise ValueError("Independent BrickLayer audit blocked Studio export; inspect bricklayer-audit.json")
         info = {"total_parts": count, "application": "Car2LEGO_3D",
                 "description": "Car2LEGO_3D assembly; physical assembly unverified."}
         destination = directory / "model.io"
@@ -80,6 +91,6 @@ def export_studio(source, directory, thumbnail=None):
             temporary.replace(destination)
         finally:
             temporary.unlink(missing_ok=True)
-        record.update(**report, format="unencrypted ZIP with recursive LDraw references",
+        record.update(**report, bricklayer=independent, format="unencrypted ZIP with recursive LDraw references",
                       outputs={"model.io": digest(destination)})
     return destination

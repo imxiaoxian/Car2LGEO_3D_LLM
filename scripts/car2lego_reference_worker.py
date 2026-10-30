@@ -8,6 +8,8 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+import time
+from uuid import uuid4
 from contextlib import ExitStack
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -17,6 +19,7 @@ from dotenv import dotenv_values
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from car2lego3d.reference_plan import reference_plan, shot_fingerprint, validate_plan
 from car2lego3d.image_slots import IMAGE_CONCURRENCY, image_slot
+from car2lego3d.reference_gate import assess_reference_gate
 
 
 SINGLE_VEHICLE_VIEW = (
@@ -34,7 +37,17 @@ SINGLE_VEHICLE_VIEW = (
 VIEW_SHOTS = {"front": "front", "rear": "back", "body": "left", "wheels": "right"}
 
 
-def configure_shots(service, shots):
+def visual_identity(identity):
+    """Only constraints consumed by image prompts invalidate dependent pixels."""
+    if not identity:
+        return None
+    corrections = [{key: task.get(key) for key in ('kind', 'modules', 'expected', 'verification')}
+                   for task in identity.get('reference_gate', {}).get('repair_tasks', [])]
+    return dict(anchor_sha256=identity.get('anchor_sha256'), observations=identity.get('observations'),
+                local_corrections=sorted(corrections, key=lambda task: json.dumps(task, sort_keys=True)))
+
+
+def configure_shots(service, shots, identity=None):
     """Process-local adapter; the upstream GPT image client and prompts stay in use."""
     service.ALL_REFERENCE_VIEWS.update({s.id: s.instructions() for s in shots})
     service.REFERENCE_VIEWS.update({s.id: s.instructions() for s in shots if s.category != "detail"})
@@ -58,6 +71,19 @@ def configure_shots(service, shots):
     def enforce_camera(request, info):
         if info:
             shot = next(s for s in shots if s.id == info[0])
+            if identity and shot.id != "overview":
+                request['prompt'] += (
+                    "\nVISIBLE IDENTITY LOCK FROM THE ACTUAL ANCHOR: " +
+                    json.dumps(identity["observations"], ensure_ascii=False) +
+                    ". Preserve these observed colours, rims, roof and glazing across cameras. "
+                    "These anchor observations take priority over incidental identity drift in parent "
+                    "views. Null means unseen or uncertain, not permission to invent a new variant.")
+                constraints = visual_identity(identity)
+                if constraints['local_corrections']:
+                    request['prompt'] += "\nKNOWN LOCAL ANCHOR DEFECTS: " + json.dumps(
+                        constraints['local_corrections'], ensure_ascii=False) + (
+                        ". Preserve identity but apply these explicit local corrections; actual anchor observations "
+                        "remain an audit of the uncorrected image, not a target for these defective details.")
             request['prompt'] += (
                 "\nFINAL SHOT CONTRACT (takes priority over pose/opening descriptions in the appearance brief "
                 "and parent images): " + shot.instructions() +
@@ -72,33 +98,74 @@ def configure_shots(service, shots):
         client = original_factory(*args, **kwargs)
         original_edit, original_generate = client.images.edit, client.images.generate
 
-        async def audited(call):
+        async def audited(call, request, files=()):
+            def event(status, **values):
+                directory = Path(state_storage.get()) if state_storage.get() else None
+                if directory:
+                    directory.mkdir(parents=True, exist_ok=True)
+                    record = dict(schema="reference-transport.v1", request_id=request_id,
+                        view=context.get()[0] if context.get() else None,
+                        time=datetime.now(timezone.utc).isoformat(), status=status, **values)
+                    with (directory / "reference-transport.jsonl").open("a", encoding="utf-8") as log:
+                        log.write(json.dumps(record) + "\n")
+
+            request_id, started = uuid4().hex, None
             try:
                 async with image_slot():
-                    return await call()
+                    started = time.monotonic()
+                    event("started", model=request.get("model"), quality=request.get("quality"),
+                        size=request.get("size"), prompt_characters=len(request.get("prompt", "")),
+                        prompt_sha256=hashlib.sha256(request.get("prompt", "").encode()).hexdigest(),
+                        inputs=[dict(name=Path(file.name).name, bytes=Path(file.name).stat().st_size,
+                            sha256=hashlib.sha256(Path(file.name).read_bytes()).hexdigest()) for file in files])
+                    result = await call()
+                    event("completed", seconds=round(time.monotonic() - started, 3))
+                    return result
             except json.JSONDecodeError as error:
+                event("failed", seconds=round(time.monotonic() - started, 3) if started else None,
+                      exception_type=type(error).__name__)
                 info = context.get()
                 directory = Path(state_storage.get()) if state_storage.get() else None
                 if directory:
                     directory.mkdir(parents=True, exist_ok=True)
                     (directory / f"invalid-response-{info[0] if info else 'unknown'}.txt").write_text(error.doc, encoding="utf-8")
                 raise
+            except Exception as error:
+                event("failed", seconds=round(time.monotonic() - started, 3) if started else None,
+                    exception_type=type(error).__name__, http_status=getattr(error, "status_code", None),
+                    cause_type=type(error.__cause__).__name__ if error.__cause__ else None)
+                raise
 
         async def edit(*, image, **request):
             info = context.get()
-            request = enforce_camera(request, info)
             with ExitStack() as stack:
-                images = list(image)
-                existing = {str(Path(f.name).resolve()) for f in images}
-                for path in info[1] if info else []:
-                    if str(path.resolve()) not in existing:
-                        images.append(stack.enter_context(path.open("rb")))
-                return await audited(lambda: original_edit(image=images, **request))
+                original = {str(Path(file.name).resolve()): file for file in image}
+                # Related views establish the requested side before the front-left
+                # identity anchor. They remain real inputs, never mirrored images.
+                parents = sorted(info[1], key=lambda p: p.stem == "overview") if info else []
+                paths, seen = [], set()
+                for path in [str(path.resolve()) for path in parents] + list(original):
+                    signature = hashlib.sha256(Path(path).read_bytes()).digest()
+                    if signature not in seen:
+                        paths.append(path)
+                        seen.add(signature)
+                images = [original[path] if path in original else stack.enter_context(Path(path).open("rb"))
+                          for path in paths]
+                if info:
+                    labels = [f"image {index + 1}: {Path(path).stem}" for index, path in enumerate(paths)]
+                    request['prompt'] += "\nATTACHED REFERENCE IDENTITIES: " + "; ".join(labels) + ". " \
+                        "left/right refer to the vehicle's own sides. overview locks identity only. " \
+                        "Use the related right-side inputs for right-side details; do not copy the " \
+                        "front-left overview camera or reflect its asymmetric features."
+                request = enforce_camera(request, info)
+                return await audited(lambda: original_edit(image=images, **request), request, images)
 
         async def generate(**request):
             info = context.get()
+            if info and info[0] == "overview" and info[1]:
+                return await edit(image=[], **request)
             request = enforce_camera(request, info)
-            return await audited(lambda: original_generate(**request))
+            return await audited(lambda: original_generate(**request), request)
 
         client.images.edit, client.images.generate = edit, generate
         return client
@@ -111,16 +178,29 @@ state_storage = ContextVar("reference_diagnostics", default=None)
 
 
 async def generate_reference_set(service, state, atomic_json, shots, context=None, prompts=None,
-                                 concurrency=IMAGE_CONCURRENCY, attempts=6, retry_delay=15):
+                                 concurrency=IMAGE_CONCURRENCY, attempts=6, retry_delay=15,
+                                 identity_reader=None, batch_reviewer=None, max_batch_repairs=3):
     validate_plan(shots)
     if not 1 <= concurrency <= IMAGE_CONCURRENCY:
         raise ValueError("Reference concurrency must be between 1 and 5")
+    if not isinstance(max_batch_repairs, int) or isinstance(max_batch_repairs, bool) or not 0 <= max_batch_repairs <= 3:
+        raise ValueError("Batch repair budget must be between 0 and 3")
     directory = service.design_directory(state)
+    base_corrections = dict(state.get("reference_corrections", {}))
+    correction_checkpoint = directory / "reference-batch-corrections.json"
+    if correction_checkpoint.is_file():
+        saved = json.loads(correction_checkpoint.read_text(encoding="utf-8"))
+        corrections = dict(base_corrections)
+        for name, correction in saved.get("corrections", {}).items():
+            if saved.get("base", {}).get(name) == base_corrections.get(name):
+                corrections[name] = correction
+        state = {**state, "reference_corrections": corrections}
     semaphore = asyncio.Semaphore(concurrency)
     manifest, done = {}, set()
     prompts = prompts if prompts is not None else {}
     batch_index = 0
     batches = []
+    view_failures = {}
 
     def batch_status(status, batch, failures=()):
         now = datetime.now(timezone.utc).isoformat()
@@ -133,9 +213,12 @@ async def generate_reference_set(service, state, atomic_json, shots, context=Non
                        failed_views=list(failures))
         if status != "running":
             current["finished_at"] = now
+        else:
+            current.pop("finished_at", None)
         record = dict(schema="car2lego3d.reference-dispatch.v1", status=status,
             batch_index=batch_index, batch_size=concurrency,
             views=[s.id for s in batch], failed_views=list(failures),
+            failed_details={view: view_failures[view] for view in failures if view in view_failures},
             completed_views=sorted(done), expected_views=len(shots),
             wait_for_batch_completion=True, batches=batches, updated_at=now)
         atomic_json(directory / "reference-dispatch.json", record)
@@ -150,8 +233,9 @@ async def generate_reference_set(service, state, atomic_json, shots, context=Non
                     async with semaphore:
                         return await service.ReferenceImageService().generate(local, only={shot.id})
                 except Exception as error:
-                    print(json.dumps({**service.failure_details(error, "reference", attempt=attempt),
-                                      "view": shot.id}), flush=True)
+                    details = {**service.failure_details(error, "reference", attempt=attempt), "view": shot.id}
+                    view_failures[shot.id] = details
+                    print(json.dumps(details), flush=True)
                     if not service.transient_model_error(error) or attempt == attempts:
                         raise
                     await asyncio.sleep(min(retry_delay * attempt, 90))
@@ -159,10 +243,19 @@ async def generate_reference_set(service, state, atomic_json, shots, context=Non
             if context:
                 context.reset(token)
 
+    def fingerprint(shot, parents):
+        camera = shot_fingerprint(shot, parents)
+        correction = state.get("reference_corrections", {}).get(shot.id)
+        if not correction and (shot.id == "overview" or not state.get("identity_lock")):
+            return camera
+        return hashlib.sha256(json.dumps(dict(camera=camera, identity=visual_identity(state.get("identity_lock")) if shot.id != "overview" else None,
+                                         correction=correction),
+                                         sort_keys=True).encode()).hexdigest()
+
     def shot_request(shot, parents):
         return [{"view": shot.id, "focus": shot.focus, "angles": [shot.camera],
                  "modules": list(shot.modules), "reason": "Modular reconstruction reference",
-                 "dependency_fingerprint": shot_fingerprint(shot, parents)}]
+                 "dependency_fingerprint": fingerprint(shot, parents)}]
 
     anchor = next(s for s in shots if s.id == "overview")
     state = {**state, "requested_reference_shots": shot_request(anchor, {})}
@@ -179,7 +272,7 @@ async def generate_reference_set(service, state, atomic_json, shots, context=Non
     def enrich(ref, shot, parents):
         return {**ref, **shot.record(), "view": shot.id, "synthetic": True,
                 "inferred_hidden_geometry": shot.category == "detail",
-                "parents": parents, "request_fingerprint": shot_fingerprint(shot, parents),
+                "parents": parents, "request_fingerprint": fingerprint(shot, parents),
                 "prompt": prompts.get(shot.id) or ref.get("prompt"),
                 "consistency": {"status": "unverified", "issues": []}}
 
@@ -188,6 +281,44 @@ async def generate_reference_set(service, state, atomic_json, shots, context=Non
     done.add("overview")
     atomic_json(manifest_path, manifest)
     batch_status("completed", [anchor])
+    if identity_reader is not None:
+        for repair in range(max_batch_repairs + 1):
+            identity = await identity_reader(directory / ref["path"], manifest["brief"])
+            state = {**state, "identity_lock": identity}
+            manifest["identity_lock"] = identity
+            atomic_json(manifest_path, manifest)
+            verdict = identity.get("anchor_review", {})
+            gate = assess_reference_gate({'overview': {**verdict, 'sha256': ref['sha256']}}) if verdict else None
+            if not verdict or gate['allowed']:
+                break
+            if repair == max_batch_repairs:
+                view_failures[anchor.id] = dict(view=anchor.id, stage="reference_content_review",
+                    exception_type="ReferenceContentError", message=verdict["correction"],
+                    attempts=repair + 1, retryable=False)
+                batch_status("failed", [anchor], [anchor.id])
+                raise ValueError("Identity anchor needs algorithm diagnosis after bounded repairs: " + verdict["correction"])
+            history = directory / "references/history"
+            history.mkdir(exist_ok=True)
+            rejected_anchor = history / ("overview-" + ref["sha256"] + ".png")
+            shutil.copy2(directory / ref["path"], rejected_anchor)
+            corrections = {**state.get("reference_corrections", {}), "overview": verdict["correction"] +
+                           "\nReplace the rejected image with source SHA256 " + ref["sha256"]}
+            state = {**state, "reference_corrections": corrections}
+            state["requested_reference_shots"] = shot_request(anchor, {})
+            atomic_json(correction_checkpoint, dict(base=base_corrections, corrections=corrections))
+            done.remove("overview")
+            batch_status("running", [anchor])
+            try:
+                await request(state, anchor, [rejected_anchor])
+            except Exception:
+                batch_status("failed", [anchor], [anchor.id])
+                raise
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            ref = next(row for row in manifest["images"] if row["view"] == "overview")
+            manifest["images"] = [row for row in manifest["images"] if row["view"] != "overview"] + [enrich(ref, anchor, {})]
+            done.add("overview")
+            atomic_json(manifest_path, manifest)
+            batch_status("completed", [anchor])
     with tempfile.TemporaryDirectory(prefix="reference-set-", dir=directory.parent) as scratch:
         async def generate(shot):
             refs_by_id = {r["view"]: r for r in manifest["images"]}
@@ -229,16 +360,60 @@ async def generate_reference_set(service, state, atomic_json, shots, context=Non
                 raise ValueError("Reference dependency graph stalled")
             # Wait for the entire batch, including retries, before starting
             # another group. The SDK slot lock also caps other worker processes.
-            for start in range(0, len(ready), concurrency):
-                batch = ready[start:start + concurrency]
-                batch_index += 1
+            batch = ready[:concurrency]
+            batch_index += 1
+            batch_status("running", batch)
+            pending = batch
+            for repair in range(max_batch_repairs + 1):
+                results = await asyncio.gather(*(generate(s) for s in pending), return_exceptions=True)
+                failures = [shot.id for shot, result in zip(pending, results) if isinstance(result, BaseException)]
+                if failures:
+                    batch_status("failed", batch, failures)
+                    for result in results:
+                        if isinstance(result, BaseException):
+                            raise result
+                if batch_reviewer is None:
+                    break
+                records = {row["view"]: row for row in manifest["images"]}
+                targets = {shot.id: {**records[shot.id], "file": str(directory / records[shot.id]["path"])}
+                           for shot in pending}
+                for shot in pending:
+                    targets[shot.id]['comparison_images'] = {
+                        parent: dict(file=str(directory / records[parent]['path']), sha256=records[parent]['sha256'])
+                        for parent in shot.parents if parent.endswith('_closed')}
+                try:
+                    report = await batch_reviewer(directory / records["overview"]["path"], manifest["brief"],
+                                                  targets, state.get("identity_lock"))
+                    if set(report.get("shots", {})) != set(targets):
+                        raise ValueError("Batch review omitted requested cameras")
+                except Exception as error:
+                    for shot in pending:
+                        view_failures[shot.id] = {**service.failure_details(error, "reference_content_review", attempt=repair + 1),
+                            'view': shot.id, 'stage': 'reference_content_review'}
+                    batch_status('failed', batch, [shot.id for shot in pending])
+                    raise
+                blocked = assess_reference_gate({name: {**result, 'sha256': records[name]['sha256']}
+                    for name, result in report['shots'].items()})['blocked_views']
+                rejected = {name: report['shots'][name] for name in blocked}
+                atomic_json(directory / "reference-batch-review.json", dict(batch_index=batch_index,
+                    repair=repair, report=report))
+                if not rejected:
+                    break
+                if repair == max_batch_repairs:
+                    view_failures.update({name: dict(view=name, stage="reference_content_review",
+                        exception_type="ReferenceContentError", message=result["correction"],
+                        attempts=repair + 1, retryable=False) for name, result in rejected.items()})
+                    batch_status("failed", batch, list(rejected))
+                    raise ValueError("Reference batch needs algorithm diagnosis after bounded repairs: " + ", ".join(rejected))
+                corrections = dict(state.get("reference_corrections", {}))
+                for name, result in rejected.items():
+                    corrections[name] = result["correction"] + "\nReplace the rejected image with source SHA256 " + records[name]["sha256"]
+                    done.remove(name)
+                state = {**state, "reference_corrections": corrections}
+                atomic_json(correction_checkpoint, dict(base=base_corrections, corrections=corrections))
+                pending = [shot for shot in batch if shot.id in rejected]
                 batch_status("running", batch)
-                results = await asyncio.gather(*(generate(s) for s in batch), return_exceptions=True)
-                failures = [shot.id for shot, result in zip(batch, results) if isinstance(result, BaseException)]
-                batch_status("failed" if failures else "completed", batch, failures)
-                for result in results:
-                    if isinstance(result, BaseException):
-                        raise result
+            batch_status("completed", batch)
     manifest['images'] = [r for r in manifest['images'] if r['view'] in {s.id for s in shots}]
     atomic_json(manifest_path, manifest)
     return {"reference_brief": manifest["brief"], "reference_images": manifest["images"]}
@@ -355,12 +530,23 @@ def main():
     if not service.settings.openai_image_model.startswith("gpt-image-"):
         raise ValueError("The source configuration must select a GPT Image model.")
     shots = reference_plan(state["make"] + " " + state["model"])
-    context, prompts = configure_shots(service, shots)
+    identity = {}
+    context, prompts = configure_shots(service, shots, identity)
+    async def read_identity(anchor, brief):
+        from car2lego3d.reference_identity import lock_identity
+        record = await asyncio.to_thread(lock_identity, anchor, brief, storage / "identity-lock")
+        identity.update(record)
+        return record
+    async def review_batch(anchor, brief, targets, identity):
+        from car2lego3d.reference_review import review_camera_batch
+        return await asyncio.to_thread(review_camera_batch, anchor, brief, targets,
+                                       storage / "batch-review", identity)
     calls = []
     state["consume_call"] = lambda kind: calls.append(kind)
     state["checkpoint_progress"] = lambda stage, percent: print(json.dumps({"stage": stage, "progress": percent}), flush=True)
     try:
-        result = asyncio.run(generate_reference_set(service, state, atomic_json, shots, context, prompts))
+        result = asyncio.run(generate_reference_set(service, state, atomic_json, shots, context, prompts,
+                                                   identity_reader=read_identity, batch_reviewer=review_batch))
     except Exception as error:
         print(json.dumps(service.failure_details(error, "reference")), flush=True)
         return 1

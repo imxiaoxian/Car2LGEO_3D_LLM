@@ -1,5 +1,7 @@
 # Project isolation
 
+> Historical record (2026-10-16). The user's 2026-10-29 consolidation decision supersedes the two-repository and desktop-only boundaries below. Current routing and recovery locations are documented in [unified-workflows.md](unified-workflows.md). `D:/lego` remains read-only.
+
 This is the independently versioned LLM + Blender implementation. Its exact repository name is **Car2LGEO_3D_LLM**.
 
 | Project | Modelling method | Local checkout | UI / API |

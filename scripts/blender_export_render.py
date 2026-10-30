@@ -89,20 +89,61 @@ trees = {name: BVHTree.FromPolygons(vertices, faces) for name, (vertices, faces)
 surface_connections = []
 
 
-def measure_connection(obj, label, edges, target_roles, region):
-    targets = [o for o in objects if o != obj and o.get("car_role") in target_roles and o.name in trees]
-    samples = []
+def measure_connection(obj, label, edges, target_roles, region, width_coverage=None, *, target_objects=None, records=None):
+    candidates = objects if target_objects is None else target_objects
+    targets = [o for o in candidates if o != obj and o.get("car_role") in target_roles and o.name in trees]
+    samples, spans = [], []
     for a, b in edges:
-        steps = max(2, math.ceil((b - a).length / .01))
+        length = (b - a).length
+        steps = max(2, math.ceil(length / .01))
+        spans.append(dict(offset=len(samples), count=steps + 1, length_m=length))
         samples.extend(a.lerp(b, i / steps) for i in range(steps + 1))
-    distances = []
+    distances, witnesses = [], []
     for point in samples:
-        hits = [trees[o.name].find_nearest(point) for o in targets]
-        distances.append(min((h[3] for h in hits if h[0] is not None), default=None))
-    surface_connections.append(dict(source=obj.name, seam=label, region=region,
-        target_roles=target_roles, targets=[o.name for o in targets], sample_count=len(samples),
+        hits = [(o.name, trees[o.name].find_nearest(point)) for o in targets]
+        nearest = min(((name, hit) for name, hit in hits if hit[0] is not None), key=lambda item: item[1][3], default=None)
+        distances.append(nearest[1][3] if nearest else None)
+        if nearest:
+            witnesses.append(dict(point_m=list(point), nearest_m=list(nearest[1][0]),
+                target=nearest[0], distance_m=nearest[1][3]))
+    destination = surface_connections if records is None else records
+    destination.append(dict(source=obj.name, seam=label, region=region,
+        target_roles=sorted(target_roles), targets=[o.name for o in targets], sample_count=len(samples),
         sampled_length_m=sum((b - a).length for a, b in edges), distances_m=distances,
+        worst_samples=sorted(witnesses, key=lambda item: item['distance_m'], reverse=True)[:10],
+        source_edge_count=len(edges),
+        sampling=dict(schema="seam-sampling.v1", maximum_step_m=.01, edges=spans),
         method="source mesh seam edges sampled every <=10 mm to evaluated target triangles"))
+    if width_coverage is not None:
+        destination[-1].update(boundary_width_coverage=width_coverage,
+            edge_selection="cross-car boundary tangents within lower/upper height band")
+
+
+def open_boundary_edges(faces):
+    uses = {}
+    for face in faces:
+        for a, b in zip(face, face[1:] + face[:1]):
+            edge = tuple(sorted((a, b)))
+            uses[edge] = uses.get(edge, 0) + 1
+    return [edge for edge, count in uses.items() if count == 1]
+
+
+def glazing_contact_edges(vertices, boundary, side):
+    zlow, zhigh = min(v[2] for v in vertices), max(v[2] for v in vertices)
+    cutoff = zlow + .2 * (zhigh - zlow) if side == "lower" else zhigh - .2 * (zhigh - zlow)
+    def in_band(z):
+        return z <= cutoff + 1e-8 if side == "lower" else z >= cutoff - 1e-8
+    # Height alone includes sloping pillar edges, which do not seat on the cowl/header.
+    edges = [(a, b) for a, b in boundary if in_band((a[2] + b[2]) / 2)
+        and abs(b[1] - a[1]) > max(abs(b[0] - a[0]), abs(b[2] - a[2]))]
+    band = [v[1] for v in vertices if in_band(v[2])]
+    width = max(band) - min(band) if band else 0
+    intervals = sorted((min(a[1], b[1]), max(a[1], b[1])) for a, b in edges)
+    covered, end = 0, float('-inf')
+    for low, high in intervals:
+        covered += max(0, high - max(low, end))
+        end = max(end, high)
+    return edges, min(1, covered / width) if width > 1e-8 else 0
 
 
 for obj in objects:
@@ -127,18 +168,36 @@ for obj in objects:
             key = tuple(sorted(edge))
             edge_uses[key] = edge_uses.get(key, 0) + 1
     boundary = [(vertices[a], vertices[b]) for (a, b), uses in edge_uses.items() if uses == 1]
-    zlow, zhigh = min(v.z for v in vertices), max(v.z for v in vertices)
     for side, target_roles in (("lower", ["body", "cowl"] if role != "rear_window" else ["body", "engine_deck"]),
                                ("upper", ["roof", "header"])):
-        edges = [(a, b) for a, b in boundary if (a.z + b.z) / 2 <= zlow + .2 * (zhigh - zlow)] if side == "lower" else [
-            (a, b) for a, b in boundary if (a.z + b.z) / 2 >= zhigh - .2 * (zhigh - zlow)]
-        measure_connection(obj, side, edges, target_roles, "cabin")
+        edges, coverage = glazing_contact_edges(vertices, boundary, side)
+        measure_connection(obj, side, edges, target_roles, "cabin", coverage)
 
-door_contacts = []
+door_contacts, door_perimeters = [], []
 for door in scene.objects:
     if door.get("car_role") != "door_assembly":
         continue
     members = [o for o in object_bounds if door.name in o["ancestors"]]
+    member_names = {m["name"] for m in members}
+    bounds_by_name = {o["name"]: o for o in object_bounds}
+    moving_doors = {o.name for o in scene.objects if o.get("car_role") == "door_assembly"}
+    fixed = [o for o in objects if not moving_doors.intersection(bounds_by_name[o.name]["ancestors"])]
+    own_frames = [o for o in objects if o.name in member_names
+        and o.get("car_role") in {"door_panel", "door_frame", "glass_gasket", "door_seal"}]
+    for member in members:
+        if member["role"] not in {"door_panel", "side_window"}:
+            continue
+        obj = scene.objects[member["name"]]
+        raw = [obj.matrix_world @ v.co for v in obj.data.vertices]
+        boundary = open_boundary_edges([list(p.vertices) for p in obj.data.polygons])
+        edges = [(raw[a], raw[b]) for a, b in boundary]
+        # All perimeter edges are measured, including edges without planner labels.
+        targets = fixed + [o for o in own_frames if o.get("car_role") == "door_frame"] if member["role"] == "door_panel" else own_frames
+        roles = {"body", "pillar", "cowl", "sill", "rocker", "roof", "body_transition", "door_frame"} if member["role"] == "door_panel" else {
+            "door_panel", "door_frame", "glass_gasket", "door_seal"}
+        measure_connection(obj, "perimeter", edges, roles, "doors", target_objects=targets, records=door_perimeters)
+        door_perimeters[-1].update(door=door.name, role=member["role"],
+            boundary_status="measured" if boundary else "unverified_closed_source_mesh")
     frame_vertices, frame_faces = [], []
     for member in members:
         if member["role"] not in {"door_panel", "door_frame"}:
@@ -196,16 +255,31 @@ metadata = {"bounds_m": [list(low), list(high)], "dimensions_mm": list(size * 10
     "objects": object_bounds, "blender_version": bpy.app.version_string,
     "triangles": sum(o["triangles"] for o in object_bounds), "door_window_contacts": door_contacts,
     "glass_visibility": glass_visibility, "surface_connections": surface_connections,
+    "door_perimeter_contacts": door_perimeters,
     "inward_meshes_corrected": normalized,
     "measurement": "evaluated world-space vertices; mirrors and trim included"}
 (directory / "scene-metrics.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+
+def metadata_json(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, "to_dict"):
+        return metadata_json(value.to_dict())
+    if hasattr(value, "to_list"):
+        return metadata_json(value.to_list())
+    if isinstance(value, dict):
+        return {key: metadata_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [metadata_json(item) for item in value]
+    raise TypeError("Unsupported scene metadata type: " + type(value).__name__)
 
 
 def property_json(obj, key, default):
     value = obj.get(key)
     if value is None:
         return default
-    return json.loads(value) if isinstance(value, str) else value.to_dict() if hasattr(value, "to_dict") else value
+    return metadata_json(json.loads(value) if isinstance(value, str) else value)
 
 
 semantic_nodes = []
@@ -256,18 +330,39 @@ scene.render.resolution_percentage = 100
 scene.render.image_settings.file_format = "PNG"
 scene.render.image_settings.color_mode = "RGBA"
 scene.render.film_transparent = True
-scene.world.use_nodes = True
-scene.world.node_tree.nodes["Background"].inputs["Color"].default_value = (.7, .7, .7, 1)
-scene.world.node_tree.nodes["Background"].inputs["Strength"].default_value = .6
 scene.view_settings.view_transform = "AgX"
-for name, position, energy, scale in [("Key", (-2,-4,6), 2200, 5), ("Fill", (2,4,4), 1800, 5), ("Rim", (5,-2,5), 2400, 4)]:
-    bpy.ops.object.light_add(type="AREA", location=centre + Vector(position))
-    light = bpy.context.object
-    light.name = name
-    light.data.energy = energy
-    light.data.shape = "DISK"
-    light.data.size = scale
-    light.rotation_euler = (centre - light.location).to_track_quat("-Z", "Y").to_euler()
+
+
+def configure_inspection_lighting(scene, centre):
+    # Broad softboxes otherwise obscure a shallow windscreen with a white reflection.
+    for obj in list(scene.objects):
+        if obj.type == "LIGHT":
+            bpy.data.objects.remove(obj, do_unlink=True)
+    scene.world.use_nodes = True
+    background = scene.world.node_tree.nodes["Background"]
+    background.inputs["Color"].default_value = (.7, .7, .7, 1)
+    background.inputs["Strength"].default_value = .04
+    lights = []
+    for name, position, energy, scale in [("Key", (-2,-4,6), 2200, 5),
+                                         ("Fill", (2,4,4), 1800, 5),
+                                         ("Rim", (5,-2,5), 2400, 4)]:
+        bpy.ops.object.light_add(type="AREA", location=centre + Vector(position))
+        light = bpy.context.object
+        light.name = name
+        light.data.energy = energy
+        light.data.shape = "DISK"
+        light.data.size = scale
+        light.visible_glossy = False
+        light.rotation_euler = (centre - light.location).to_track_quat("-Z", "Y").to_euler()
+        lights.append(dict(name=name, position_m=list(light.location), energy_w=energy,
+                           size_m=scale, visible_glossy=light.visible_glossy))
+    return dict(schema="blender-inspection-lighting.v1", world_strength=.04, lights=lights,
+        purpose="inspection of glazing, interior and panel boundaries",
+        material_shaders_modified=False, optical_measurement=False)
+
+
+lighting = configure_inspection_lighting(scene, centre)
+(directory / "render-rig.json").write_text(json.dumps(lighting, indent=2), encoding="utf-8")
 bpy.ops.object.camera_add()
 camera = bpy.context.object
 scene.camera = camera

@@ -1,0 +1,22 @@
+{
+  "schema": "assembly-training-config.v1",
+  "model_id": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "revision": "2e1fd397ee46e1388853d2af2c993145b0f1098a",
+  "dtype": "bfloat16",
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+  "context_length": 1024,
+  "oom_context_length": 512,
+  "batch_size": 1,
+  "gradient_accumulation_steps": 16,
+  "gradient_checkpointing": true,
+  "learning_rate": 0.0002,
+  "epochs": 1,
+  "seed": 42,
+  "max_grad_norm": 1.0,
+  "snapshot": "668d4cc69acf48633f657ea63666f1283e57889ad025cbeb6038d0527056c158",
+  "protocol_hash": "5b724c029102745b9d154c42ffabd72fbc8ad326db18a7b5c25642c604f1d9f1",
+  "decision_tokens": 256
+}

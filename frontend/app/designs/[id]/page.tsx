@@ -9,9 +9,10 @@ import dynamic from "next/dynamic";
 import { categoryNames, viewNames } from "@/lib/showcase";
 import ProductImage from "@/components/ProductImage";
 import VehicleSpecifications from "@/components/VehicleSpecifications";
+import CreationEvidence from "@/components/CreationEvidence";
 const AssemblyViewer = dynamic(() => import("@/components/viewer/AssemblyViewer"), { ssr:false });
 const stateNames: Record<string,string> = { completed:"已验收",draft:"装配草稿",paused:"已暂停",cancelled:"已取消",failed:"生成失败",pending:"等待生成",processing:"设计生成中",passed:"已通过",unverified:"未验证" };
-const checkNames:Record<string,string>={passed:"已通过",failed:"未通过",unverified:"未验证",measured:"已测量"};
+const checkNames:Record<string,string>={pass:"已通过",fail:"未通过",passed:"已通过",failed:"未通过",unverified:"未验证",measured:"已测量"};
 const gateNames: Record<string,string> = { parts:"零件数据",transforms:"刚体变换",connections:"结构连接",collisions:"碰撞",dimensions:"成品尺寸",mechanisms:"机构运动",colors:"零件配色",appearance:"外观",insertion_paths:"插入路径",reference_consistency:"参考一致性",export_integrity:"导出回读",physical_geometry:"部件物理尺寸",assembly_steps:"搭建步骤" };
 const detailViews=new Set(["engine_bay","engine_details","cockpit","seats","doors","hood_opening","steering","suspension","side_intakes","lights","dashboard","door_hinges","hood_hinges","underbody","rear_seats","cargo_bay"]);
 type ReferenceView = { view: string; url: string; model: string; synthetic: boolean; category?: string; label?: string; purpose?: string; module?: string };
@@ -22,6 +23,8 @@ function stageLabel(stage: string) {
   const [phase, section] = stage.split(":");
   if (phase === "recognition") return "识别车辆照片";
   if (phase === "reconstruction") return "多视角 3D 重建";
+  if (phase === "shape_reconstruction") return "Hunyuan 形状参考重建";
+  if (phase === "assembly_agent") return "装配 Agent 构建与检查";
   if (phase === "reference_images") return `生成${viewNames[section] || "车辆"}参考图`;
   if (phase === "section" || phase === "building") return `构建${viewNames[section] || "车辆部位"}`;
   return ({ starting: "准备设计", vehicle_research:"模型对话获取车辆参数",reference_brief:"规划参考角度",reference_consistency:"检查整车与细节一致性",planning: "规划结构", assembly:"模块装配", validation:"数字检查",repair:`局部修复 ${section || ""}`,rendering:"真实零件渲染",instructions:"生成步骤说明",exporting:"导出 Studio",acceptance:"整车验收",draft:"装配草稿",paused:"任务已暂停",cancelled:"任务已取消",completed: "设计已完成", pending: "等待生成", processing: "生成模型", failed: "生成失败" } as Record<string, string>)[phase] || "生成模型";
@@ -64,6 +67,7 @@ export default function DesignDetailPage() {
       try {
         const [status, detail] = await Promise.all([getDesignStatus(id), getDesign(id)]);
         if (cancelled) return;
+        if (detail.library_match) { router.replace(detail.library_match.url); return; }
         setProgress(status.progress); setStage(status.stage || status.status); setDesign(detail); setPollError(false);
         if (["pending", "processing", "paused"].includes(status.status)) timer = setTimeout(poll, 3000);
       } catch { if (!cancelled) { setPollError(true); timer = setTimeout(poll, 5000); } }
@@ -72,6 +76,7 @@ export default function DesignDetailPage() {
       try {
         const [detail, mods] = await Promise.all([getDesign(id), getModsCatalog().catch(() => ({}))]);
         if (cancelled) return;
+        if (detail.library_match) { router.replace(detail.library_match.url); return; }
         setDesign(detail); setModCatalog(mods);
         if (["pending", "processing", "paused"].includes(detail.status)) void poll();
       } catch (err) { if (!cancelled) setError(err instanceof Error ? err.message : "无法加载设计。"); }
@@ -79,7 +84,7 @@ export default function DesignDetailPage() {
     };
     void load();
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [id, refreshToken]);
+  }, [id, refreshToken, router]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -130,6 +135,8 @@ export default function DesignDetailPage() {
   const completed = design.status === "completed";
   const available = completed || design.status === "draft";
   const allReferences: ReferenceView[] = [
+    ...(design.inspection_images || []).map(image => ({ ...image, view: `inspection_${image.view}`, model: "ldraw",
+      label: `检查 · ${viewNames[image.view] || image.view}`, purpose: "交付检查图" })),
     ...(design.renders || []).map(r => ({view:`render_${r.view}`,url:r.url,model:"ldraw",synthetic:false})),
     ...(design.assembly_preview_url ? [{ view: "assembly", url: design.assembly_preview_url, model: "ldraw", synthetic: false }] : []),
     ...(design.assembly_preview_rear_url ? [{ view: "assembly_rear", url: design.assembly_preview_rear_url, model: "ldraw", synthetic: false }] : []),
@@ -149,6 +156,25 @@ export default function DesignDetailPage() {
     { label: "子模型", format: ".mpd", icon: FileCode2, path: design.file_urls.mpd },
     { label: "步骤说明", format: ".pdf", icon: FileText, path: design.file_urls.pdf },
     { label: "质量报告", format: ".json", icon: FileText, path: design.file_urls.quality },
+    { label: "装配图", format: ".json", icon: FileCode2, path: design.file_urls.graph },
+    { label: "数字检查", format: ".json", icon: FileText, path: design.file_urls.checks },
+    { label: "模块检查", format: ".json", icon: FileText, path: design.file_urls.modules },
+    { label: "模块任务", format: ".json", icon: FileText, path: design.file_urls.module_tasks },
+    { label: "零件依赖清单", format: ".json", icon: FileText, path: design.file_urls.dependencies },
+    { label: "定制件与安装说明", format: ".zip", icon: Box, path: design.file_urls.custom_parts },
+    { label: "参考图检查", format: ".json", icon: FileText, path: design.file_urls.reference_gate },
+    { label: "参考图待修项", format: ".json", icon: FileText, path: design.file_urls.repairs },
+    { label: "装配步骤", format: ".json", icon: FileText, path: design.file_urls.steps },
+    { label: "三维模型", format: ".glb", icon: Box, path: design.file_urls.glb },
+    { label: "Blender 源文件", format: ".blend", icon: Box, path: design.file_urls.blend },
+    { label: "装配 Blender 文件", format: ".blend", icon: Box, path: design.file_urls.assembly_blend },
+    { label: "视角检查记录", format: ".json", icon: FileText, path: design.file_urls.presentation },
+    { label: "交付检查报告", format: ".json", icon: FileText, path: design.file_urls.delivery },
+    { label: "标准零件 BOM", format: ".json", icon: FileText, path: design.file_urls.bom },
+    { label: "语义场景", format: ".json", icon: FileCode2, path: design.file_urls.semantic },
+    { label: "重建模型", format: ".glb", icon: Box, path: design.file_urls.reconstruction },
+    { label: "机构检查", format: ".json", icon: FileText, path: design.file_urls.motion },
+    { label: "Agent 记录", format: ".json", icon: FileText, path: design.file_urls.agent },
     { label: "零件清单", format: ".csv", icon: FileSpreadsheet, path: design.file_urls.csv },
     { label: "BrickLink", format: ".xml", icon: ShoppingBag, path: design.file_urls.xml },
   ];
@@ -160,9 +186,18 @@ export default function DesignDetailPage() {
       <div className="design-heading"><div><Link href="/" className="back-link"><ArrowLeft size={14} />工作室</Link><h1>{title}</h1><p className="secondary">{design.car?.year ? <>{design.car.year} <span className="dot-separator">·</span> </> : null}{design.parent_design_id ? "定制版" : "原始设计"}</p></div><span className={`status-label ${completed ? "success" : design.status === "failed" ? "failure" : ""}`}>{completed ? <Check size={15} /> : processing ? <LoaderCircle className="spin" size={15} /> : null}{stateNames[design.status] || design.status}</span></div>
       {design.scene_url && <AssemblyViewer id={id} highlightedModule={highlightModule} />}
       {!!design.official_build_references?.length && <details className="quality-issues"><summary>官方搭建参考 · {design.official_build_references.length} 套</summary>{design.official_build_references.map(guide=><div key={guide.set_num}><a className="text-link" href={guide.instructions_url} target="_blank" rel="noreferrer">{guide.name} · {guide.set_num}<ExternalLink size={14}/></a><span className="secondary">{guide.local_pdf ? "本地说明书可用" : "官方说明书"}</span></div>)}</details>}
-      {design.job && <div className="task-controls">{processing && <button className="icon-button" title="暂停" aria-label="暂停任务" disabled={controlBusy} onClick={() => void handleControl("pause")}><Pause size={18} /></button>}{["paused","failed"].includes(design.status) && <button className="icon-button" title="恢复任务" aria-label="恢复任务" disabled={controlBusy} onClick={() => void handleControl("resume")}><Play size={18} /></button>}{!["completed","cancelled"].includes(design.status) && <button className="icon-button" title="取消任务" aria-label="取消任务" disabled={controlBusy} onClick={() => void handleControl("cancel")}><Square size={17} /></button>}<span className="secondary">文本 {design.job.calls.text} / {design.job.limits.text} · 生图已调用 {design.job.calls.image} 次</span></div>}
+      {design.job && <div className="task-controls">{processing && <button className="icon-button" title="暂停" aria-label="暂停任务" disabled={controlBusy} onClick={() => void handleControl("pause")}><Pause size={18} /></button>}{["paused","failed","cancelled"].includes(design.status) && <button className="icon-button" title="恢复任务" aria-label="恢复任务" disabled={controlBusy} onClick={() => void handleControl("resume")}><Play size={18} /></button>}{!["completed","cancelled"].includes(design.status) && <button className="icon-button" title="取消任务" aria-label="取消任务" disabled={controlBusy} onClick={() => void handleControl("cancel")}><Square size={17} /></button>}<span className="secondary">文本 {design.job.calls.text} / {design.job.limits.text} · 生图已调用 {design.job.calls.image} 次</span></div>}
       {design.car && <VehicleSpecifications key={id} car={design.car} data={design.physical_specifications} requirements={design.scale_requirements} />}
-      {design.quality_report && <section className="quality-section"><div className="section-heading"><h2>装配验收</h2><span className="secondary">assembly_v3</span></div><div className="quality-gates">{Object.entries(design.quality_report.gates).map(([key,value]) => <div key={key}><span>{gateNames[key] || key}</span><strong data-status={value}>{checkNames[value] || value}</strong></div>)}<div><span>Studio 检查</span><strong data-status={design.quality_report.studio.status}>{checkNames[design.quality_report.studio.status]}</strong></div><div><span>实物验证</span><strong>{checkNames[design.quality_report.physical.status]}</strong></div></div><div className="dimension-row">{Object.entries(design.actual_dimensions_mm || {}).map(([key,value]) => <span key={key}>{({length:"长",width:"宽",height:"高",wheelbase:"轴距"} as Record<string,string>)[key]} {value} mm</span>)}</div><details className="quality-issues"><summary>{design.quality_report.issues.length} 项装配问题</summary>{design.quality_report.issues.slice(0,30).map((issue,index) => <div key={index}><button className="text-link" onClick={() => setHighlightModule(issue.modules[0])}>{issue.kind} · {issue.parts.join(", ")}</button><button className="icon-button" title="重试此模块" aria-label={`重试 ${issue.modules[0]}`} disabled={controlBusy || !["draft","failed","paused"].includes(design.status)} onClick={() => void handleControl("retry",issue.modules[0])}><RotateCcw size={15} /></button></div>)}</details></section>}
+      <CreationEvidence design={design} onReviewed={() => setRefreshToken(token => token + 1)} />
+      {design.quality_report && <section className="quality-section">
+        <div className="section-heading"><h2>装配验收</h2><span className="secondary">{design.workflow_version || "assembly_v3"}</span></div>
+        <div className="quality-gates">{Object.entries(design.quality_report.gates).map(([key,value]) => <div key={key}><span>{gateNames[key] || key}</span><strong data-status={value}>{checkNames[value] || value}</strong></div>)}<div><span>Studio 检查</span><strong data-status={design.quality_report.studio.status}>{checkNames[design.quality_report.studio.status]}</strong></div><div><span>实物验证</span><strong>{checkNames[design.quality_report.physical.status]}</strong></div></div>
+        <div className="dimension-row">{Object.entries(design.actual_dimensions_mm || {}).map(([key,value]) => <span key={key}>{({length:"长",width:"宽",height:"高",wheelbase:"轴距"} as Record<string,string>)[key]} {value} mm</span>)}</div>
+        <details className="quality-issues"><summary>{design.quality_report.issues.length} 项装配问题</summary>{design.quality_report.issues.slice(0,30).map((issue,index) => {
+          const issueModule = issue.modules?.[0];
+          return <div key={index}><button className="text-link" disabled={!issueModule} onClick={() => issueModule && setHighlightModule(issueModule)}>{issue.kind} · {issue.parts.join(", ")}</button><button className="icon-button" title={issueModule ? "重试此模块" : "此问题没有对应模块"} aria-label={issueModule ? `重试 ${issueModule}` : "无法重试此问题"} disabled={!issueModule || controlBusy || !["draft","failed","paused"].includes(design.status)} onClick={() => { if (issueModule) void handleControl("retry",issueModule); }}><RotateCcw size={15} /></button></div>;
+        })}</details>
+      </section>}
       {allReferences.length>0 && <div className="reference-groups" role="tablist" aria-label="参考图分类">{groups.filter(group=>group.id==="all" || allReferences.some(image=>group.id==="model" ? !image.synthetic && image.model === "ldraw" : group.id==="details" ? isDetailReference(image) : image.category === "exterior" || (image.synthetic && !isDetailReference(image)))).map(group=><button key={group.id} role="tab" aria-selected={referenceGroup===group.id} onClick={()=>setReferenceGroup(group.id)}>{group.label}</button>)}</div>}
       <div className={`reference-stage ${!reference ? "awaiting" : ""}`}>
         {reference ? <><ProductImage src={apiFileUrl(reference.url)} alt={`${title} ${reference.label || viewNames[reference.view] || reference.view}参考图`} className="reference-main" priority /><button className="icon-button expand-image" onClick={() => setExpanded(true)} title="放大参考图" aria-label="放大参考图"><Maximize2 size={18} /></button></> : <div className="awaiting-content">{processing ? <LoaderCircle size={34} strokeWidth={1.3} className="spin" /> : <Box size={38} strokeWidth={1} />}<p>{processing ? stageLabel(stage) : "暂无车辆参考图"}</p></div>}
@@ -177,7 +212,7 @@ export default function DesignDetailPage() {
       {design.parent_design_id && <Link href={`/designs/${design.parent_design_id}`} className="text-link parent-link">查看原始设计 <ChevronRight size={15} /></Link>}
     </section>
     {available && <>
-      <section className="export-band"><div className="content-width export-layout"><h2>带走你的设计。</h2><div className="export-grid">{exports.filter(item => item.path).map(item => <a key={item.format} href={apiFileUrl(item.path)} className="export-item"><item.icon size={26} strokeWidth={1.3} /><div><strong>{item.label}</strong><span>{item.format}</span></div><ArrowDownToLine size={16} /></a>)}</div></div></section>
+      <section className="export-band"><div className="content-width export-layout"><h2>带走你的设计。</h2><div className="export-grid">{exports.filter(item => item.path).map(item => <a key={`${item.label}-${item.path}`} href={apiFileUrl(item.path)} className="export-item"><item.icon size={26} strokeWidth={1.3} /><div><strong>{item.label}</strong><span>{item.format}</span></div><ArrowDownToLine size={16} /></a>)}</div></div></section>
       <div className="detail-workspace content-width">
         <section id="parts" className="parts-section"><div className="section-heading"><h2>每一块，都有位置。</h2><span className="secondary">{design.parts.length} 种零件</span></div><div className="parts-table-wrap"><table className="parts-table"><thead><tr><th>零件编号</th><th>颜色</th><th>数量</th></tr></thead><tbody>{design.parts.map(part => <tr key={`${part.part_num}-${part.ldraw_color_id}`}><td>{part.part_num}</td><td>{part.color_name || `LDraw ${part.ldraw_color_id}`}</td><td>{part.quantity}</td></tr>)}</tbody></table>{!design.parts.length && <p className="secondary">暂无零件清单</p>}</div></section>
         <section id="customize" className="customize-section"><div className="section-heading"><h2>让经典，更像你。</h2><span className="secondary">车辆定制</span></div>

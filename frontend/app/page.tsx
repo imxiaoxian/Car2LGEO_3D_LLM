@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Camera, ChevronRight, ImagePlus, LoaderCircle, X } from "lucide-react";
-import { createDesign, createDesignFromImage } from "@/lib/api";
+import { AssemblyPlanners, createDesign, createDesignFromImage, getAssemblyPlanners } from "@/lib/api";
 import { showcaseCars } from "@/lib/showcase";
 import ProductImage from "@/components/ProductImage";
 import BrandSelector from "@/components/BrandSelector";
@@ -27,8 +27,22 @@ function CreatePage() {
   const [selected, setSelected] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [assemblyPlanner, setAssemblyPlanner] = useState("");
+  const [reconstructionBackend, setReconstructionBackend] = useState("gpt-blender");
+  const [reuseLibrary, setReuseLibrary] = useState(true);
+  const [planners, setPlanners] = useState<AssemblyPlanners | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const car = showcaseCars[selected];
+  const activePlanner = assemblyPlanner || planners?.default || "legacy";
+  const usesAgent = activePlanner !== "legacy";
+
+  useEffect(() => {
+    if ((reconstructionBackend === "hybrid" && !usesAgent) || (reconstructionBackend === "hunyuan-mv" && usesAgent)) {
+      setReconstructionBackend("gpt-blender");
+    }
+  }, [usesAgent, reconstructionBackend]);
+
+  useEffect(() => { let alive = true; getAssemblyPlanners().then(value => { if (alive) setPlanners(value); }).catch(() => {}); return () => { alive = false; }; }, []);
 
   useEffect(() => {
     const previousJob = search.get("job");
@@ -71,9 +85,10 @@ function CreatePage() {
     setLoading(true); setError("");
     try {
       const design = mode === "photo" && photo
-        ? await createDesignFromImage(photo, { make: make.trim(), model: model.trim(), year: year ? Number(year) : undefined })
-        : await createDesign(make.trim(), model.trim(), year ? Number(year) : undefined);
-      router.push(`/designs/${design.id}`);
+        ? await createDesignFromImage(photo, { make: make.trim(), model: model.trim(), year: year ? Number(year) : undefined, assembly_planner: assemblyPlanner || undefined, reuse_library: reuseLibrary ? undefined : false, reconstruction_backend: reconstructionBackend })
+        : await createDesign(make.trim(), model.trim(), year ? Number(year) : undefined, undefined, assemblyPlanner || undefined, reuseLibrary ? undefined : false, reconstructionBackend);
+      if (design.library_match) router.push(design.library_match.url);
+      else if ("id" in design) router.push(`/designs/${design.id}`);
     } catch (err) { setError(err instanceof Error ? err.message : "创建失败，请重试。"); setLoading(false); }
   }
 
@@ -95,7 +110,9 @@ function CreatePage() {
           <label className="field"><span>年款（选填）</span><input type="number" inputMode="numeric" min={1900} max={2030} value={year} onChange={e => setYear(e.target.value)} placeholder="例如 1990" disabled={loading} /></label>
           <button type="submit" className="button primary create-button" disabled={loading}>{loading ? <><LoaderCircle size={18} className="spin" />{mode === "photo" ? "识别中" : "创建中"}</> : <>创建设计 <ArrowRight size={17} /></>}</button>
         </div>
-        <div className="form-bottom"><span>BrickLink Studio .io</span></div>
+        <div className="form-bottom"><span>BrickLink Studio .io</span>{planners && <label className="field"><span>装配方案</span><select aria-label="装配方案" value={assemblyPlanner} onChange={e => setAssemblyPlanner(e.target.value)} disabled={loading}><option value="">当前默认方案</option><option value="legacy">现有装配</option>{planners.alternatives.filter(item => item.id !== "local_base").map(item => <option key={item.id} value={item.id} disabled={!item.configured}>{item.id === "codex" ? "本地 Codex" : "本地微调模型"}{item.configured ? "" : "（未配置）"}</option>)}<option value="auto" disabled={planners.comparison_status !== "accepted"}>评测优胜方案{planners.comparison_status !== "accepted" ? "（待评测）" : ""}</option></select></label>}</div>
+        <label className="field"><span>建模方案</span><select aria-label="建模方案" value={reconstructionBackend} onChange={event => setReconstructionBackend(event.target.value)} disabled={loading}><option value="gpt-blender">LLM + Blender</option><option value="hunyuan-mv" disabled={usesAgent}>Hunyuan 多视图 · 轮廓拟合</option><option value="hybrid" disabled={!usesAgent}>Blender + Hunyuan · 原生装配</option></select></label>
+        <label className="archive-preference"><input type="checkbox" checked={reuseLibrary} disabled={loading} onChange={event => setReuseLibrary(event.target.checked)} />优先使用车型档案</label>
         {error && <p role="alert" className="error-message">{error}</p>}
       </form>
     </section>

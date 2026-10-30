@@ -17,6 +17,22 @@ def main():
     setup.add_argument("--backend", choices=["hunyuan-mv", "gpt-blender", "triposr"], default=DEFAULT_BACKEND)
     commands.add_parser("recipes", help="Show vehicle families and their official LEGO references")
     commands.add_parser("doctor", help="Show environment and CUDA availability")
+    envelope = commands.add_parser("mesh-envelope", help="Convert a mesh using the migrated advisory-size envelope fitter")
+    envelope.add_argument("--mesh", type=Path, required=True)
+    envelope.add_argument("--output", type=Path, required=True)
+    envelope.add_argument("--vehicle-specs", type=Path)
+    envelope.add_argument("--reference-views", type=Path)
+    envelope.add_argument("--body-style")
+    envelope.add_argument("--length-studs", type=int)
+    envelope.add_argument("--width-studs", type=int, choices=[8, 10, 12])
+    envelope.add_argument("--up-axis", choices=["x", "y", "z"], default="z")
+    envelope.add_argument("--yaw", type=float, default=0)
+    envelope.add_argument("--color", type=int)
+    envelope.add_argument("--no-rear-wing", action="store_true")
+    envelope.add_argument("--style-reference", type=Path)
+    optimize = commands.add_parser("mesh-optimize", help="Search and review migrated wedge assembly candidates")
+    optimize.add_argument("--directory", type=Path, required=True)
+    optimize.add_argument("--style-reference", type=Path)
     web = commands.add_parser("web", help="Serve the local generation page and brand selector")
     web.add_argument("--port", type=int, default=LEGACY_WEB_PORT)
     api = commands.add_parser("desktop-api", help="API for the replicated Car2LEGO desktop frontend")
@@ -84,6 +100,8 @@ def main():
             if name == "lego":
                 child.add_argument("--requirements-snapshot", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.command == "mesh-envelope" and args.length_studs is not None and args.length_studs <= 0:
+        parser.error("--length-studs must be positive")
     if args.command in ("run", "lego"):
         if args.scale_mode is None:
             args.scale_mode = "appearance" if args.scale else "exact" if args.length_studs is not None else "auto"
@@ -110,7 +128,16 @@ def main():
         parser.error("Spec-based run uses the calibrated X-long/Z-up frame; omit --up-axis and --yaw")
     if args.command == "run" and args.reference_image and not args.prompt:
         parser.error("--reference-image requires --prompt")
-    if args.command == "research":
+    if args.command == "mesh-envelope":
+        from .mesh_envelope.carfit import convert_car
+        print(convert_car(source=args.mesh, directory=args.output, vehicle_spec=vehicle_spec,
+            reference_views=args.reference_views, body_style=args.body_style,
+            length_studs=args.length_studs, width_studs=args.width_studs, up_axis=args.up_axis,
+            yaw=args.yaw, color=args.color, rear_wing=not args.no_rear_wing, style_reference=args.style_reference))
+    elif args.command == "mesh-optimize":
+        from .mesh_envelope.optimization import optimize_directory
+        print(json.dumps(optimize_directory(args.directory, style_reference=args.style_reference), ensure_ascii=False))
+    elif args.command == "research":
         from .research import research_vehicle
         result = research_vehicle({"brand": args.brand, "model": args.model, "variant": args.variant}, args.output)
         print(json.dumps(result, ensure_ascii=False, indent=2))

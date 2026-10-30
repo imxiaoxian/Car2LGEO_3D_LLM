@@ -57,3 +57,14 @@ and catalog assets are identified below.
 
 LEGO and BrickLink are trademarks of their owners. This research project is not
 affiliated with or endorsed by them.
+
+- **BrickWright / BrickLayer**: https://github.com/AvaLovelace1/brickwright.
+  Optional `bricklayer-sdk==0.1.0` provides independent digital collision, ground
+  support and connector checks. SDK code is MIT; bundled LDraw geometry/data
+  include CC BY 2.0 and CC BY 4.0 material. Retain the installed package's LICENSE
+  and NOTICE when redistributing it. Its published benchmark is not validation
+  of this project's vehicle outputs.
+- **BrickAgent / BrickBench**: https://github.com/kulits/BrickAgent (MIT), and
+  **LEGO Forge**: https://github.com/ericfu-tianchi/lego-forge (MIT code, LDraw
+  geometry CC BY 2.0), are architecture references. Their code and part assets
+  are not copied into this repository. See `docs/open-source-assembly-references.md`.

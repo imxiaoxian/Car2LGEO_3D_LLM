@@ -1,0 +1,176 @@
+[
+  {
+    "source": "src/car2lego3d/appearance.py",
+    "destination": "src/car2lego3d/mesh_envelope/appearance.py",
+    "source_sha256": "85f942a42a63c0258625f3b1e2febaaf9974c413fe21b5be3e50d6af2c83d466",
+    "migrated_sha256": "0df9bfb700731cbd97a7a80ec6d71909ee3dc88083018bd35c02e03fbbb01158"
+  },
+  {
+    "source": "src/car2lego3d/carfit.py",
+    "destination": "src/car2lego3d/mesh_envelope/carfit.py",
+    "source_sha256": "f4fd8522c212b2cff3ce79d641fc73a404bb1feedd724c348495991e1a22e85b",
+    "migrated_sha256": "f7b5d09a02c5ecb7fd8efd8f26fc9c9474de6b59f7eef064dc409770f98322aa"
+  },
+  {
+    "source": "src/car2lego3d/checkpoints.py",
+    "destination": "src/car2lego3d/mesh_envelope/checkpoints.py",
+    "source_sha256": "65e7a520a7a8dd419f1e96f64d91c4d9694d79e4ef10afbf0ccdab8a4b5d46db",
+    "migrated_sha256": "6379d8cdf19a2f826a76cdef9a12db11383b78a6d20800fd32142c5b86b31cca"
+  },
+  {
+    "source": "src/car2lego3d/config.py",
+    "destination": "src/car2lego3d/mesh_envelope/config.py",
+    "source_sha256": "5e8845317d450ec5f8a0054f542af4a31eabad68d80e00615ee621b6416913aa",
+    "migrated_sha256": "5e8845317d450ec5f8a0054f542af4a31eabad68d80e00615ee621b6416913aa"
+  },
+  {
+    "source": "src/car2lego3d/coupe.py",
+    "destination": "src/car2lego3d/mesh_envelope/coupe.py",
+    "source_sha256": "5770341f06f9c68d3d37c3d3a257a48fce665744b5eebbfa300b3e8d9a09473b",
+    "migrated_sha256": "5770341f06f9c68d3d37c3d3a257a48fce665744b5eebbfa300b3e8d9a09473b"
+  },
+  {
+    "source": "src/car2lego3d/details.py",
+    "destination": "src/car2lego3d/mesh_envelope/details.py",
+    "source_sha256": "8b8b845a83e134618319c18c4c21f517bc07765c83f136b2841f81c6c2d893fb",
+    "migrated_sha256": "009c006f1ca107a615b27666f75080759a966d1b6c9f03dd0df000ab2f1983e9"
+  },
+  {
+    "source": "src/car2lego3d/dialogue.py",
+    "destination": "src/car2lego3d/mesh_envelope/dialogue.py",
+    "source_sha256": "be61949e0325b51c16e32b79d42b897946d2d484461f10c38c019f5f5e3fde78",
+    "migrated_sha256": "37415b87bd800bf871d0c37e1f9cdf207d35a9f8a8fb2bc4272c22c5d62aa92a"
+  },
+  {
+    "source": "src/car2lego3d/envelope_suv.py",
+    "destination": "src/car2lego3d/mesh_envelope/envelope_suv.py",
+    "source_sha256": "2b1fe3cfab8b3b2d57092659e3f3b99ebf8b804d1de6bb2ec3c83c06ef2aa18c",
+    "migrated_sha256": "2b1fe3cfab8b3b2d57092659e3f3b99ebf8b804d1de6bb2ec3c83c06ef2aa18c"
+  },
+  {
+    "source": "src/car2lego3d/glazing.py",
+    "destination": "src/car2lego3d/mesh_envelope/glazing.py",
+    "source_sha256": "f34a4966dfc7b7f49d1ce2092d1b8570644f11e6c01e4b615a7ed55217c8f25c",
+    "migrated_sha256": "f34a4966dfc7b7f49d1ce2092d1b8570644f11e6c01e4b615a7ed55217c8f25c"
+  },
+  {
+    "source": "src/car2lego3d/interior.py",
+    "destination": "src/car2lego3d/mesh_envelope/interior.py",
+    "source_sha256": "54b9a6d9334126e3f70edc4f0656405159c8dac999e09ee1cb48999a29e30246",
+    "migrated_sha256": "54b9a6d9334126e3f70edc4f0656405159c8dac999e09ee1cb48999a29e30246"
+  },
+  {
+    "source": "src/car2lego3d/layout.py",
+    "destination": "src/car2lego3d/mesh_envelope/layout.py",
+    "source_sha256": "dc7d1b486dde965a4a55211643b32cfa0edaa52bb43087f91453530bb930619c",
+    "migrated_sha256": "16350fa35033aed28b8e0279dd25d994d26ef207fd29fd82dfd69e048925a025"
+  },
+  {
+    "source": "src/car2lego3d/lego.py",
+    "destination": "src/car2lego3d/mesh_envelope/lego.py",
+    "source_sha256": "af70abe1bbf655e84fc184d2f3527cb4519b4a0aad8d2ad055ac6a1c997122e5",
+    "migrated_sha256": "029bc26fcc2243853ed36bd67317b330646d377e28da2082423df392fecf7511"
+  },
+  {
+    "source": "src/car2lego3d/optimization.py",
+    "destination": "src/car2lego3d/mesh_envelope/optimization.py",
+    "source_sha256": "14d6307810d002727304b67dc27dff7a7550e0af57fbe9bd5c969841427b54b7",
+    "migrated_sha256": "5eac3be59625c7fa9995a9e74ac9fad9429937971e2c5d41bf48d3064ec67e9f"
+  },
+  {
+    "source": "src/car2lego3d/part_index.py",
+    "destination": "src/car2lego3d/mesh_envelope/part_index.py",
+    "source_sha256": "83a9190a7247a20f8716d1ccfa6b9059786184c05f133b14e6d28dea28882bb9",
+    "migrated_sha256": "e16d1f1d9ae02818f4eb2496e1a63d9397cd04bfd4e97283d81c65ddd209359b"
+  },
+  {
+    "source": "src/car2lego3d/quality.py",
+    "destination": "src/car2lego3d/mesh_envelope/quality.py",
+    "source_sha256": "c84a4600f1ccf3f84c54ddf8c69812154edec98c8e04ff9a930243ad814f64b9",
+    "migrated_sha256": "5c5cdf7d08c75ee7845cf82286c1c4aaf46c83dc92ea1e785ace6765af88a7ab"
+  },
+  {
+    "source": "src/car2lego3d/recipes.py",
+    "destination": "src/car2lego3d/mesh_envelope/recipes.py",
+    "source_sha256": "15b130f7a774ce1af90f5cb51b4020bfb7e1fadb1a53dbc051799951f0002e46",
+    "migrated_sha256": "54b071b37ca60baaee2db547aceb065ad8acddd74e0ef23d61c0abe920ba3542"
+  },
+  {
+    "source": "src/car2lego3d/reference_plan.py",
+    "destination": "src/car2lego3d/mesh_envelope/reference_plan.py",
+    "source_sha256": "1e19ff8ca74930c2fc14846d1617532c3f76ba0b1aab474ffb9142ecfb8f90cb",
+    "migrated_sha256": "1e19ff8ca74930c2fc14846d1617532c3f76ba0b1aab474ffb9142ecfb8f90cb"
+  },
+  {
+    "source": "src/car2lego3d/requirements.py",
+    "destination": "src/car2lego3d/mesh_envelope/requirements.py",
+    "source_sha256": "bfc14abc722e9c216260538443c2e4cf2a0f34dc0cfa76d05528ce3cf07bf918",
+    "migrated_sha256": "bfc14abc722e9c216260538443c2e4cf2a0f34dc0cfa76d05528ce3cf07bf918"
+  },
+  {
+    "source": "src/car2lego3d/research.py",
+    "destination": "src/car2lego3d/mesh_envelope/research.py",
+    "source_sha256": "c4650c9c2bbb158abe132756287705a16523486c9282b0be789917e5f76367f3",
+    "migrated_sha256": "19f4a74031456c262bd2717b22f0b635859142d889d10e9859274b8ecff879ce"
+  },
+  {
+    "source": "src/car2lego3d/reservation.py",
+    "destination": "src/car2lego3d/mesh_envelope/reservation.py",
+    "source_sha256": "f8a00770fa97091a070003ed6861eb084fbcd3064eeae9a319c4463f2cbd953a",
+    "migrated_sha256": "868a4d69dba9e45591ddcc163afa13a847feb19cb71b3532ffb90ae094f35bf7"
+  },
+  {
+    "source": "src/car2lego3d/sculpted_suv.py",
+    "destination": "src/car2lego3d/mesh_envelope/sculpted_suv.py",
+    "source_sha256": "c49c99ca39478cd396b5b85c49d178d4eaf30e539a5e28ec155d95a614633392",
+    "migrated_sha256": "c49c99ca39478cd396b5b85c49d178d4eaf30e539a5e28ec155d95a614633392"
+  },
+  {
+    "source": "src/car2lego3d/search.py",
+    "destination": "src/car2lego3d/mesh_envelope/search.py",
+    "source_sha256": "99c026350817f2632e4f9c5a1c8c7a0e39de41a13a0cd1ebcaa6d7b24d9a1cb1",
+    "migrated_sha256": "99c026350817f2632e4f9c5a1c8c7a0e39de41a13a0cd1ebcaa6d7b24d9a1cb1"
+  },
+  {
+    "source": "src/car2lego3d/sectional.py",
+    "destination": "src/car2lego3d/mesh_envelope/sectional.py",
+    "source_sha256": "ee5c4819f613855823f0d8c7d435b7ec939f754d3e27cffbd61d7573e345c1ce",
+    "migrated_sha256": "ee5c4819f613855823f0d8c7d435b7ec939f754d3e27cffbd61d7573e345c1ce"
+  },
+  {
+    "source": "src/car2lego3d/sequence.py",
+    "destination": "src/car2lego3d/mesh_envelope/sequence.py",
+    "source_sha256": "5e8c2d19179ff80bfd7666bfe70546880da5b3033386caac0bc74fa0cf1645dc",
+    "migrated_sha256": "5e8c2d19179ff80bfd7666bfe70546880da5b3033386caac0bc74fa0cf1645dc"
+  },
+  {
+    "source": "src/car2lego3d/surfaces.py",
+    "destination": "src/car2lego3d/mesh_envelope/surfaces.py",
+    "source_sha256": "7ad2c39e7b94b4f41299923c5adfcef842af0f3bc110396a09dff3d470f97702",
+    "migrated_sha256": "7ad2c39e7b94b4f41299923c5adfcef842af0f3bc110396a09dff3d470f97702"
+  },
+  {
+    "source": "src/car2lego3d/suv.py",
+    "destination": "src/car2lego3d/mesh_envelope/suv.py",
+    "source_sha256": "fdfc51c398f47213e5590c4e19e78e5176ce3c5d588d11cdc828021cc5af5823",
+    "migrated_sha256": "fdfc51c398f47213e5590c4e19e78e5176ce3c5d588d11cdc828021cc5af5823"
+  },
+  {
+    "source": "src/car2lego3d/target.py",
+    "destination": "src/car2lego3d/mesh_envelope/target.py",
+    "source_sha256": "93392ec97b1d4530013453684d0ee09a5c1e06387dfb6d8fc52cce5c90c36a7b",
+    "migrated_sha256": "81f2c0417172393e80635e1c7458a40bcaf0579a7821738480c82e8686671175"
+  },
+  {
+    "source": "src/car2lego3d/vehicle.py",
+    "destination": "src/car2lego3d/mesh_envelope/vehicle.py",
+    "source_sha256": "0b2c635d8301cfb39c86852ccf1fc2f969ba63901a1c63b6e622e2692556e69b",
+    "migrated_sha256": "ad258acf870925c4431039ddba2ed6c75ba642997e0536e511666e416114231b"
+  },
+  {
+    "source": "src/car2lego3d/wedge.py",
+    "destination": "src/car2lego3d/mesh_envelope/wedge.py",
+    "source_sha256": "ba27598792fb71d74e7b102f45416652b9d02b8a25bde33e81b86b72d55aa6a8",
+    "migrated_sha256": "ba27598792fb71d74e7b102f45416652b9d02b8a25bde33e81b86b72d55aa6a8"
+  }
+]

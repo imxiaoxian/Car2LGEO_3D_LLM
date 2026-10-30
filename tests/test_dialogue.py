@@ -1,4 +1,6 @@
 import json
+import base64
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +13,21 @@ from car2lego3d.common import write_json
 
 CONFIG = dict(api_key="test-only", base_url="https://api.example/v1", model="test-model")
 MESSAGES = [dict(role="user", content="vehicle dimensions")]
+
+
+def test_review_image_label_is_in_pixels_without_changing_the_reference(tmp_path):
+    from PIL import Image
+    from car2lego3d.common import digest
+    path = tmp_path / 'front.png'
+    Image.new('RGB', (640, 320), 'blue').save(path)
+    original = digest(path)
+    content = dialogue.image_content({'TARGET_front': path}, label_images=True)
+    encoded = content[1]['image_url']['url'].split(',', 1)[1]
+    with Image.open(BytesIO(base64.b64decode(encoded))) as labelled:
+        assert labelled.size == (640, 368)
+        assert labelled.crop((0, 0, 640, 48)).convert('L').getextrema()[0] < 30
+        assert labelled.getpixel((320, 250))[2] > 240
+    assert content[0]['text'] == 'TARGET_front' and digest(path) == original
 
 
 def response(status="completed"):
@@ -65,6 +82,15 @@ def test_incomplete_reply_is_retained_but_not_parsed(tmp_path):
         with pytest.raises(ValueError, match="did not complete"):
             dialogue.ask_json(MESSAGES, tmp_path, "test")
     assert (tmp_path / "test-response.json").is_file()
+
+
+def test_invalid_completed_json_retains_exact_text_for_bounded_schema_repair():
+    raw = response().model_dump(mode='json')
+    text = '{"shots":[{"id":"front" "status":"needs_revision"}]}'
+    raw['output'][0]['content'][0]['text'] = text
+    with pytest.raises(dialogue.ModelJSONError, match='invalid JSON') as error:
+        dialogue.parse_response(raw)
+    assert error.value.text == text
 
 
 def test_explicit_model_is_used_and_invalidates_previous_model_cache(tmp_path):

@@ -29,14 +29,14 @@ test('original creation, brand selection, optional year, and photo workflow', as
   await expect(page.getByRole('combobox', { name: '模型比例' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: '比例设计要求' })).toHaveCount(0);
   await page.getByRole('button', { name: '创建设计', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText: 'Browser test: generation disabled'})).toBeVisible();
   expect(submitted).toEqual([{ make: '测试品牌', model: 'Test' }]);
   await page.screenshot({ path: info.outputPath('creation.png') });
   await page.getByRole('button', { name: '车辆照片', exact: true }).click();
   await page.getByLabel('上传车辆照片').setInputFiles(path.join(__dirname, '../public/images/ferrari-f40.webp'));
   await expect(page.getByAltText('已选择的车辆照片')).toBeVisible();
   await page.getByRole('button', { name: '创建设计', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText: 'Browser test: generation disabled'})).toBeVisible();
   expect(photoBody).toContain('name="image"');
   expect(photoBody).not.toMatch(/name="(?:scale|scale_mode|length_studs|width_studs)"/);
   await page.getByRole('button', { name: '移除照片' }).click();
@@ -44,15 +44,15 @@ test('original creation, brand selection, optional year, and photo workflow', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
 
-test('vehicle catalog filters and prepopulates creation', async ({ page }) => {
+test('vehicle catalog filters downloadable models by brand and body', async ({ page }) => {
   await page.goto('/sets');
-  await page.getByRole('combobox', { name: '筛选品牌' }).selectOption('BMW');
-  await expect(page.getByRole('heading', { name: 'BMW M3 E30' })).toBeVisible();
+  await page.getByRole('button', { name: '筛选品牌：全部品牌' }).click();
+  await page.getByRole('textbox', { name: '搜索品牌', exact: true }).fill('宝马');
+  await page.getByRole('button', { name: '宝马 BMW', exact: true }).click();
+  await page.getByRole('combobox', { name: '筛选车辆类型' }).selectOption('race_car');
+  await expect(page.getByRole('heading', { name: '宝马 M4 GT3 EVO 赛车' })).toBeVisible();
   await expect(page.locator('.catalog-item')).toHaveCount(1);
-  const create = page.getByRole('link', { name: '创建设计', exact: true });
-  expect(await create.getAttribute('href')).not.toContain('scale');
-  await create.click();
-  await expect(page.getByRole('textbox', { name: '车型', exact: true })).toHaveValue('M3 E30');
+  await expect(page.getByRole('link', { name: '下载 .io', exact: true })).toHaveAttribute('href', /\/sets\/library\/[^/]+\/download$/);
 });
 
 test('customization and parameter dialogue omit scale even for a historical design', async ({ page }, info) => {

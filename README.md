@@ -2,7 +2,15 @@
 
 **GPT 图片 → 大模型 + Blender 建模 → 乐高结构 → BrickLink Studio `.io`**。
 
-本仓库专门维护大模型驱动的 Blender 建模方案。开源多视图重建方案独立维护在 [Car2LEGO_3D](https://github.com/imxiaoxian/Car2LEGO_3D)，两者不共用 Git 数据库、Python 环境、任务目录或构建输出。
+本仓库统一维护 LLM + Blender 与 Hunyuan 多视图方案。旧 `Car2LEGO_3D` 的轮廓拟合和候选优化迁入 `car2lego3d.mesh_envelope`，与主流程的自动/精确尺寸合同分开。详见 [整合说明](docs/unified-workflows.md)。
+
+BrickWright、BrickBench/BrickAgent、LEGO Forge 的源码对照、连接点安装工具和独立装配复核见 [开源装配参考](docs/open-source-assembly-references.md)。
+
+两套路线的架构取舍与同输入比较方法见 [两套方案分析](docs/two-pipeline-analysis-20261029.md)。[SKY-001 核验](docs/skyfall-sky001-research.md) 记录其公开能力和接入边界；当前采用分层规划思路，尚未将其注册为可用模型后端。
+
+汽车模块的真实执行证据分别记录在 [转向轮模块](docs/car-modules-20261030.md)、[闭环联动工具与确定性夹具](docs/closed-linkage-20261030.md) 和 [空场景自主联动试验](docs/autonomous-linkage-20261030.md)。软件回归、确定性夹具与自主试验保留各自结论，不据此宣称整车通过。
+
+[剪刀门诊断](docs/countach-door-20261030.md) 保留失败、离线修复和原轨迹成功续跑的独立记录；[座舱集成诊断](docs/cabin-integration-20261030.md) 检查新增内饰与受保护联动底盘的连接和运动间隙。模块诊断不代表车型外观、实体搭建或整车验收。
 
 ## 生成链路
 
@@ -12,7 +20,7 @@
 4. 根据网格、车型特征和官方 LEGO 结构参考，拟合门窗、灯组、车身、内饰与连接模块，输出 LDraw、零件清单和检查报告。
 5. 打包 Studio `.io`，核对归档内容、颜色、变换和步骤。归档通过不等于 Studio GUI、外观或实物验收通过。
 
-桌面工作流固定为 `gpt-blender`，不会回退到开源重建模型。CLI 保留显式指定的历史后端用于复查旧实验，默认仍为 `gpt-blender`。
+默认建模为 `gpt-blender`。桌面可显式选择 Hunyuan 多视图加轮廓拟合，或 Blender + Hunyuan 加原生装配代理。结合模式保留 Blender 语义，将同一参考图和尺寸规格生成的 Hunyuan 网格作为可导航、带哈希的形状参考；不据此生成真实连接器或机构验收结论。
 
 ## 本地安装
 
@@ -30,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -Python 3.11
 powershell -ExecutionPolicy Bypass -File scripts/start-web.ps1
 ```
 
-默认页面为 `http://127.0.0.1:8778`，API 为 `http://127.0.0.1:8777`。开源方案使用 8768/8767，可同时运行。每个项目每次执行一个生成任务。
+默认页面为 `http://127.0.0.1:8778`，API 为 `http://127.0.0.1:8777`。所有方案使用本仓库的环境与任务目录，每次执行一个生成任务。
 
 CLI 分阶段运行：
 
@@ -46,9 +54,9 @@ CLI 分阶段运行：
 
 前端保留品牌中文名、Logo、其他品牌自定义、车辆照片、任务详情、图片分组、装配查看和下载。不提供比例选择，约 1:12 仅作为体量与细节偏好。
 
-当前大尺寸原生轮组、玻璃与底盘配方尚未完整实现。自动尺寸任务可能保存规划后停止，不能把这种情况标成完整模型或验收通过。历史小尺寸实验可通过显式 CLI 尺寸参数复查，详见 [自动尺寸](docs/scale-requirements.md)。本次项目隔离不表示这些能力限制已经解决。
+当前大尺寸原生轮组、玻璃与底盘配方尚未完整实现。自动尺寸任务可能保存规划后停止，不能把这种情况标成完整模型或验收通过。历史小尺寸实验可通过显式 CLI 尺寸参数复查，详见 [自动尺寸](docs/scale-requirements.md)。仓库整合不表示这些能力限制已经解决。
 
-`runs/` 保存独立任务、图片、网格、装配、预览、清单和审计信息。旧工作树的本地产物保留在原位置，不与新任务混用。
+`runs/` 保存独立任务、图片、网格、装配、预览、清单和审计信息。旧工作树及历史产物在仓库外的保密备份中保留，不与新任务混用。
 
 ## 验证与历史
 
