@@ -63,6 +63,24 @@ def _linkage_pose_summary(poses):
                 failing_poses_omitted=max(0, len(failures)-12))
 
 
+def _motion_pose_summary(poses, pointer):
+    failures = [(index, pose) for index, pose in enumerate(poses) if pose.get("status") != "pass"]
+    rows = []
+    for index, pose in failures[:12]:
+        collisions = pose.get("collisions", [])
+        invalid = pose.get("invalid", [])
+        components = pose.get("components")
+        rows.append(dict({key: pose[key] for key in ("value", "positions", "status") if key in pose},
+            index=index, pointer=f"{pointer}/{index}",
+            collision_pairs=collisions[:12], collision_pairs_omitted=max(0, len(collisions)-12),
+            connectivity=pose.get("connectivity"),
+            component_count=len(components) if components is not None else None,
+            unknown=pose.get("unknown"), invalid=invalid[:12] if isinstance(invalid, list) else invalid,
+            invalid_omitted=max(0, len(invalid)-12) if isinstance(invalid, list) else 0))
+    return dict(pose_count=len(poses), pose_failures=rows,
+                pose_failures_omitted=max(0, len(failures)-12))
+
+
 def planning_evidence(observations, revision=None):
     """Keep useful observations addressable across the stateless CLI decisions."""
     parts, modules, searches, part_searches, diagnostics = {}, {}, {}, {}, {}
@@ -128,8 +146,13 @@ def planning_evidence(observations, revision=None):
                 combined_joint_states=result.get("combined_joint_states"),
                 joints=[dict(instance=row["instance"], limits=row.get("limits"), unit=row.get("unit"),
                     range_issues=row.get("range_issues", []),
-                    failing_poses=[p["value"] for p in row["poses"] if p["status"] != "pass"])
-                    for row in result["joints"]], full_resource="observations", pointer="/" + str(step), summary_only=True)
+                    failing_poses=[p["value"] for p in row["poses"] if p["status"] != "pass"],
+                    **_motion_pose_summary(row["poses"], f"/{step}/result/joints/{index}/poses"))
+                    for index, row in enumerate(result["joints"])],
+                combined=[dict(instances=row["instances"],
+                    **_motion_pose_summary(row.get("poses", []), f"/{step}/result/combined/{index}/poses"))
+                    for index, row in enumerate(result.get("combined", []))],
+                full_resource="observations", pointer="/" + str(step), summary_only=True)
         elif tool == "linkage_motion":
             diagnostics["linkage_motion"] = dict(
                 {key: result[key] for key in ("revision", "status", "driver", "passive", "rolling",
@@ -156,6 +179,16 @@ def planning_evidence(observations, revision=None):
             if isinstance(task.get("candidates"), dict):
                 summary["candidates"] = {key: task["candidates"][key] for key in (
                     "status", "required", "passing", "selected", "reason") if key in task["candidates"]}
+            if (isinstance(task.get("selection"), dict)
+                    and isinstance(task["selection"].get("missing_prior_selection"), list)):
+                selection = task["selection"]
+                missing = selection.get("missing_prior_selection", [])
+                summary["selection"] = dict(
+                    {key: selection[key] for key in ("status", "scope") if key in selection},
+                    missing_prior_selection=missing[:12], missing_prior_selection_omitted=max(0, len(missing)-12),
+                    parts={name: {key: selection["parts"][name][key] for key in (
+                        "status", "search", "query_step", "added_step") if key in selection["parts"][name]}
+                        for name in missing[:12] if name in selection.get("parts", {})})
             diagnostics["module_task"] = summary
     return dict(parts=parts, modules=modules, retrievals=searches, part_searches=part_searches,
                 diagnostics=diagnostics, mount_searches=mount_searches, context_pages=list(pages.values()))

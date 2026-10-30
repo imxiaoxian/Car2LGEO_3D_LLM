@@ -117,3 +117,75 @@ verification of 106 file hashes and LDraw/BOM totals also passed. Logs are
 `runs/cabin-integration-regression-20261030.log` and
 `runs/cabin-integration-frontend-20261030.log`. These software checks do not
 change the failed live integration result.
+
+## Preserved-trace continuation
+
+`cabin-integration-live-v1-resume-v1` continued the initial checkpoint in
+a separate directory with the same mission, execution/probe hashes and
+protected seed. No offline graph repair was imported. Its cumulative
+budget was 3,000 seconds and 100 decisions. It stopped at
+`time_budget_exhausted` after **1,210.610 additional seconds**, with
+**3,000.641 cumulative agent seconds**, 60 decisions and revision 20.
+`planner_cabin_integration_pass=false` remains the measured result.
+
+The planner raised the floor and cabin surfaces 24 LDU using a native
+`3003.dat` riser. At revision 18, all 63 ordinary single-joint samples
+and 162 ordinary paired samples pass their native pose checks. The full
+host motion status remains `fail` because the vehicle wheel-role
+requirements are absent. The separate linkage report passes nine
+steering poses and 324 individual-wheel rolling combinations, with 50
+native contacts including all 20 original contacts. These are intermediate
+measurements, not final-revision acceptance.
+
+The riser's first placement lacked a qualifying prior description
+selection. Later searches and reinstalling the same type did not erase
+that first-placement evidence. The planner eventually replaced it with
+two description-selected and successfully queried `2877.dat` grille
+bricks. The final revision has 28 native parts, including eight new cabin
+parts. Its selection evidence, bounded role placement, single-candidate
+mechanical measurement and current native static gates pass: one
+connected component, zero collisions, no unknown geometry and no invalid
+transforms. All protected seed instances and joints are preserved.
+
+The ordinary and linkage reports still refer to revision 18. The final
+acceptance issues are `motion_missing_or_stale` and
+`linkage_missing_or_stale`; their intermediate passes cannot certify the
+new support geometry at revision 20. There is no current preview, planner
+pixel feedback, IO export/roundtrip or explicit successful finish. The
+original source files remain unchanged, their complete decision bytes
+are retained as a prefix, execution/probe/input hashes were unchanged
+through termination, and no planner tool errors remain unrecovered.
+
+| Preserved continuation evidence | SHA256 |
+| --- | --- |
+| `report.json` | `9f5b669bdb6767acccaadc340e64e8d78a4fcc6d69b02d1d778f8c4cbba31efc` |
+| `assembly/agent-decisions.jsonl` | `009ca707be064266c10f9d5593bb2a970cef5c77b295f8c2d7f26b3f0139191f` |
+| `assembly/state.json` | `b383663fed8918f19fa5079a0b5a51f9398ad45d111d6c9f51c48357d2d8990a` |
+| `assembly/checks.json` | `e4bda6203b884f288e03de309122199f74c9c6a6bc24ff909feff0b8431044a8` |
+| `assembly/motion.json` | `0963defd5d3992686732e12898c30f3efec86faf3955966e8b5181b136a399ae` |
+| `assembly/linkage-motion.json` | `6d5e8dcd489380bf1cdf399b82e169a8fdc34b70141ea8a42be604bd6ec7bcb6` |
+
+## Subsequent diagnostic feedback
+
+After the continuation terminated, context v24 added bounded ordinary
+motion failure details. Individual and paired sweeps retain real pose
+indices, values/positions, native collision pairs, connectivity,
+component counts, unknown/invalid evidence and exact observation JSON
+pointers. At most 12 failures per sweep and 12 collision/invalid entries
+per failure are included, with omission counts; the existing failed-angle
+list and full report stay intact. The module-task summary also retains
+bounded missing-selection records and their original search, query and
+first-placement indices. It does not turn a late query into prior evidence.
+
+Three new regression tests cover interleaved pose indices and report
+paths, context reads, freshness, source immutability and bounded omission
+counts. The focused agent/context/cabin regression passed **117 tests**
+in 9.84 seconds. Frontend production build and the 106 historical file
+hashes and LDraw/BOM totals passed. Logs are
+`runs/motion-feedback-regression-20261030.log` and
+`runs/motion-feedback-frontend-20261030.log`. Applying the new summary
+to the preserved initial motion report also identified the actual
+tie-bar/floor collision pairs. The earlier 1,349-test full local suite
+predates this feedback change. The new execution fingerprint has not
+been used for a new live cabin run; historical traces retain their
+original contracts and acceptance labels.

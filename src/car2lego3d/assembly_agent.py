@@ -58,7 +58,7 @@ def wire_json(value):
 
 
 DECISION_TOKENS = 256
-CONTEXT_VERSION = "assembly-context.v23"
+CONTEXT_VERSION = "assembly-context.v24"
 
 
 def planner_context_contract(backend, *, shared_text=False):

@@ -67,6 +67,82 @@ def test_planner_motion_summary_preserves_missing_wheel_response():
         revision=53)["diagnostics"]["motion"]["current"]
 
 
+def test_motion_failure_details_keep_real_indices_pairs_and_report_pointers_after_reads():
+    from copy import deepcopy
+
+    collision = dict(a="root/tie", b="root/floor", evidence="native-collider-OBB")
+    failed = dict(value=30, status="fail", positions={"root/driver": 30},
+        collisions=[collision], connectivity="fail", components=[["root/tie"], ["root/floor"]],
+        unknown=2, invalid=["root/bad"])
+    poses = [dict(value=0, status="pass"), failed,
+             dict(value=45, status="pass"), dict(failed, value=60)]
+    report = dict(revision=18, status="fail", joints=[dict(instance="root/driver", poses=poses)],
+        combined=[dict(instances=["root/driver", "root/wheel"], poses=poses)])
+    observations = {"41": dict(tool="motion", ok=True, result=report),
+        "42": dict(tool="context", ok=True, revision_after=18, result=dict(
+            resource="observations", pointer="/41/result/joints/0/poses/1", offset=0,
+            total=20, next_offset=None, text="failure details"))}
+    original = deepcopy(observations)
+    summary = planning_evidence(observations, revision=18)["diagnostics"]["motion"]
+    joint = summary["joints"][0]
+    assert summary["current"] and joint["failing_poses"] == [30, 60]
+    assert joint["pose_count"] == 4 and joint["pose_failures_omitted"] == 0
+    assert [pose["index"] for pose in joint["pose_failures"]] == [1, 3]
+    detail = joint["pose_failures"][0]
+    assert detail["pointer"] == "/41/result/joints/0/poses/1"
+    assert detail["positions"] == failed["positions"] and detail["value"] == 30
+    assert detail["status"] == "fail" and detail["connectivity"] == "fail"
+    assert detail["component_count"] == 2 and detail["unknown"] == 2
+    assert detail["invalid"] == ["root/bad"] and detail["invalid_omitted"] == 0
+    assert detail["collision_pairs"] == [collision] and detail["collision_pairs_omitted"] == 0
+    combined = summary["combined"][0]
+    assert combined["instances"] == report["combined"][0]["instances"]
+    assert combined["pose_failures"][1]["pointer"] == "/41/result/combined/0/poses/3"
+    assert not planning_evidence(observations, revision=19)["diagnostics"]["motion"]["current"]
+    assert planning_evidence(observations)["diagnostics"]["motion"]["current"] is None
+    assert observations == original
+
+
+def test_motion_failure_details_bound_poses_pairs_and_invalid_items():
+    pairs = [dict(a=f"root/part/{i}", b="root/floor") for i in range(15)]
+    poses = [dict(value=i, status="unverified", collisions=pairs, unknown=1,
+                  invalid=[f"root/bad/{j}" for j in range(14)]) for i in range(16)]
+    report = dict(revision=1, status="unverified", joints=[dict(instance="root/driver", poses=poses)])
+    summary = planning_evidence({"9": dict(tool="motion", ok=True, result=report)})["diagnostics"]["motion"]
+    joint = summary["joints"][0]
+    assert joint["failing_poses"] == list(range(16))
+    assert joint["pose_count"] == 16 and joint["pose_failures_omitted"] == 4
+    assert len(joint["pose_failures"]) == 12
+    detail = joint["pose_failures"][-1]
+    assert detail["index"] == 11 and detail["pointer"] == "/9/result/joints/0/poses/11"
+    assert detail["collision_pairs"] == pairs[:12] and detail["collision_pairs_omitted"] == 3
+    assert len(detail["invalid"]) == 12 and detail["invalid_omitted"] == 2
+    assert detail["component_count"] is None and detail["connectivity"] is None
+    assert summary["combined"] == []
+
+
+def test_module_task_retains_bounded_failed_selection_and_first_placement_evidence():
+    from copy import deepcopy
+
+    names = [f"part{i}.dat" for i in range(15)]
+    selection = dict(status="fail", missing_prior_selection=names,
+        parts={name: dict(status="fail", search=dict(step=8, query="Brick 2 x 2"),
+                         query_step=9, added_step=4) for name in names},
+        scope="Observed description search and native query before placement")
+    observations = {"44": dict(tool="module_progress", ok=True, revision_after=18,
+        result=dict(module_task=dict(status="fail", selection=selection)))}
+    original = deepcopy(observations)
+    task = planning_evidence(observations, revision=18)["diagnostics"]["module_task"]
+    retained = task["selection"]
+    assert task["revision_matches"] and task["pointer"] == "/44/result/module_task"
+    assert retained["status"] == "fail" and retained["scope"] == selection["scope"]
+    assert retained["missing_prior_selection"] == names[:12]
+    assert retained["missing_prior_selection_omitted"] == 3
+    assert retained["parts"] == {name: selection["parts"][name] for name in names[:12]}
+    assert retained["parts"][names[0]]["added_step"] < retained["parts"][names[0]]["query_step"]
+    assert observations == original
+
+
 def test_empty_search_diagnostics_and_native_part_searches_survive_later_reads():
     empty = dict(modules=[], filters=dict(types=["module"]), diagnostics=dict(
         reason="unknown_vehicle_types", available_types=["sports_car"], filters_relaxed=False))
