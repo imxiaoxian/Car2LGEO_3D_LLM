@@ -78,7 +78,12 @@ frontend service was not replaced. Logs are
 The next milestone after this historical single-wheel run was linked left/right
 steering installed in a connected chassis, with actual wheel-axis response and
 persistent native contacts. The later deterministic fixture establishes that
-tool capability; a live planner trial remains pending. Existing
-axial-clearance diagnostics do not establish physical retention. This single
-seeded wheel is not an autonomous whole car, an unseen-part generalization
+tool capability. At that milestone, a live planner trial was still pending;
+the subsequent [autonomous linkage trial](autonomous-linkage-20261030.md)
+records a failed first run and a successful independent second run from an
+empty scene. The second run passes nine linkage poses, 324 individual-wheel
+rolling combinations, ordinary motion and IO roundtrip at its final revision.
+That later evidence does not change the scope of this historical single-wheel
+run. Existing axial-clearance diagnostics do not establish physical retention.
+This single seeded wheel is not an autonomous whole car, an unseen-part generalization
 result, a Studio GUI acceptance result or a physically accepted assembly.
