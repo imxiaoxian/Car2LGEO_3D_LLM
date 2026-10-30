@@ -218,3 +218,95 @@ frame/glass on the replacement support, then repeat current static and
 motion checks before planner pixel feedback, export and finish. Three
 structural candidates, independent role review and cabin integration
 remain separate outstanding work.
+
+## Independent offline native-contact repair
+
+`countach-door-live-v4-offline-repair` starts from the unchanged live
+revision 12 and its original selection trajectory. It does not replace
+the live attempt or its failed postcheck. Native port queries preceded
+one strict atomic build containing two snaps: frame `17454.dat` port
+`1:1:5` to support `32000.dat` port `0:1:3`, then glass `17457.dat` port
+`0` to frame port `2`. The resulting revision 13 moves the frame and glass
+together by -10 LDU on X. Their relative transform is unchanged within
+1e-8; every other instance, the fixed bearing, role bindings and door
+joint remain unchanged.
+
+Current native static gates pass with one seven-part connected component,
+zero collisions and no missing native evidence. All nine door poses from
+0 to 90 degrees retain connectivity and pass collision checks. The panel
+and glass rise with the door; their mean endpoint upward displacements
+are 101.776 and 13.630 LDU respectively. Historical selection evidence
+still passes. The full vehicle reports retain absent-wheel requirements;
+the local diagnostic does not rewrite them as vehicle passes.
+
+The IO archive roundtrips to the same graph. All original live files were
+hashed before and after: `source_unchanged=true`. The actual six-view
+contact sheet was opened and inspected. It shows a framed, nonblank white
+Technic panel and white window frame; the clear insert remains difficult
+to distinguish against the frame. This establishes a repaired digital
+mechanism, not Countach appearance, physical retention or cabin fit.
+The report explicitly keeps `live_planner=false`,
+`planner_door_diagnostic_pass=false`, no planner pixel feedback and no
+vehicle completion credit.
+
+| Separate offline repair evidence | SHA256 |
+| --- | --- |
+| `report.json` | `c55ed1d4d981e9f35070767621c887d9cd7d8ca1608853096d2825fbeefe0d48` |
+| `repair-operation.json` | `b7d07bd29b34823ca10b451f9f7a9499361c2dd72e027387944265aaa8f6fdd1` |
+| `assembly/checks.json` | `9c87abd83403ee63dd5b6b51bf04daf7e7d47b5d07a2ff459e58dcc50fa361de` |
+| `assembly/motion.json` | `70b4f797daa8927a18a4af5ef7e9eda3082b1f8bea2fc872e24eb40608d278ce` |
+| `assembly/model.io` | `bf054bcb337100449d9342a95ff4e174abcb9dc7bf86bc3d865d67de4dec5bbd` |
+| Six-view contact sheet | `4339ad782d4f24b8b0ba79aec3bc88eec927fbcb24d95b8e6959ff47708daf31` |
+
+## Original live trace resumed
+
+`countach-door-live-v4-resume-v1` copies the original failed v4 checkpoint
+at revision 12 and continues its own planner trace. It does not import the
+offline repair. The original execution, probe and mission hashes were
+verified before resuming. The original decision bytes remain an exact
+prefix, and hashes of every original v4 file are unchanged afterward.
+The original failed v4, failed postcheck and successful offline repair
+remain separate artifacts with their original acceptance labels.
+
+The continuation finished in **529.234 seconds**, with cumulative agent
+elapsed time **2,165.0 seconds**. The final agent has 70 decisions and
+revision 14, `stop_reason=planner_finished` and
+`planner_door_diagnostic_pass=true`. It briefly reintroduced an unqualified
+support, then replaced it at step 63 with previously searched and queried
+`32000.dat` and reseated the frame/glass. Native check, nine door poses,
+module progress, preview, export and finish followed at steps 64 through 69.
+The original connector and binding failures and their recoveries remain
+in the trace; the transport failure at step 54 is separately recorded as
+recovered when planner decisions resumed at step 55. No unrecovered errors
+remain. This is one successful resumed trial, not a reliability estimate
+or a fresh empty-scene trial.
+
+The final seven-part BOM uses the supplied black `3700.dat`, black
+`11214.dat` and `2780.dat`, white `11954.dat`, `17454.dat` and `32000.dat`,
+and transparent `17457.dat` (color 47). Current native static gates and
+all nine 0-90 degree door poses pass. The panel and glass rise by mean
+101.776 and 33.630 LDU at the open endpoint; the protected fixed mount
+remains unchanged. The final IO roundtrips to the same graph. Current
+preview pixels reached planner decisions 68 and 69.
+
+The actual final six-view contact sheet was opened and inspected. It is
+nonblank and frames the panel, window/frame and hinge support. The clear
+insert remains difficult to distinguish against the white frame; these
+pixels do not establish Countach appearance. Native static and motion
+reports retain their full-vehicle statuses for absent wheels. The local
+door diagnostic does not certify candidate comparison, independent role
+review, cabin fit, Studio compatibility, retention, load capacity, physical
+assembly or a complete car. `vehicle_completion_ready=false`.
+
+| Preserved live continuation evidence | SHA256 |
+| --- | --- |
+| `report.json` | `751a18b08d26ef07756e84efbcfb70f13fe8efc0f7bb8981c5dc105d121ccd39` |
+| `assembly/agent-decisions.jsonl` | `5132741d2872356cfefbe20d61d7094516f985d37374e4eab39a753a4149370e` |
+| `assembly/model.io` | `7ed72e040a82522d3ffb971fd419dc60a1f2b77fbae4f5049d5c29bc7d975d50` |
+| Six-view contact sheet | `fd86988a47d41e2620af839fb9313ab053703d67c0c45b17b3d996b428ac0862` |
+
+The same-source recovery regression log records 44 tests passing in
+19.49 seconds (`runs/countach-door-recovery-regression-20261030.log`);
+the separate frontend production build also passed
+(`runs/countach-door-recovery-frontend-20261030.log`). These software
+checks are separate from the measured native live result.
