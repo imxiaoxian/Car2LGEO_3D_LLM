@@ -1,0 +1,1636 @@
+{
+  "source": "D:\\lego\\Studio 2.0\\ldraw",
+  "parts": {
+    "3001": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3001"
+    },
+    "30010": {
+      "width": 2,
+      "height": 1.0,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30010"
+    },
+    "30014": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30014"
+    },
+    "30016": {
+      "width": 6,
+      "height": 12.17,
+      "depth": 6,
+      "kind": "brick",
+      "name": "LDraw 30016"
+    },
+    "3001d01": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3001D01"
+    },
+    "3002": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3002"
+    },
+    "30022": {
+      "width": 6,
+      "height": 2.89,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30022"
+    },
+    "30027": {
+      "width": 1,
+      "height": 0.83,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 30027"
+    },
+    "30027a": {
+      "width": 1,
+      "height": 0.83,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 30027A"
+    },
+    "30027ac01": {
+      "width": 2,
+      "height": 1.5,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30027AC01"
+    },
+    "30027b": {
+      "width": 1,
+      "height": 0.83,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 30027B"
+    },
+    "3003": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3003"
+    },
+    "300301": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 300301"
+    },
+    "3004": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3004"
+    },
+    "300401": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 300401"
+    },
+    "30041": {
+      "width": 8,
+      "height": 0.92,
+      "depth": 6,
+      "kind": "brick",
+      "name": "LDraw 30041"
+    },
+    "30042": {
+      "width": 6,
+      "height": 0.83,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30042"
+    },
+    "300421": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 300421"
+    },
+    "30043": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30043"
+    },
+    "3005": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3005"
+    },
+    "3005-0": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3005-0"
+    },
+    "3005-1": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3005-1"
+    },
+    "3005-1b": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3005-1B"
+    },
+    "3005-2": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3005-2"
+    },
+    "3005-3": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3005-3"
+    },
+    "30060": {
+      "width": 2,
+      "height": 2.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30060"
+    },
+    "30062": {
+      "width": 6,
+      "height": 0.5,
+      "depth": 6,
+      "kind": "plate",
+      "name": "LDraw 30062"
+    },
+    "30063": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 30063"
+    },
+    "30065": {
+      "width": 4,
+      "height": 0.83,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30065"
+    },
+    "3007": {
+      "width": 8,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3007"
+    },
+    "30070": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 30070"
+    },
+    "30071": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30071"
+    },
+    "30073": {
+      "width": 1,
+      "height": 8.17,
+      "depth": 6,
+      "kind": "brick",
+      "name": "LDraw 30073"
+    },
+    "30074": {
+      "width": 1,
+      "height": 8.17,
+      "depth": 6,
+      "kind": "brick",
+      "name": "LDraw 30074"
+    },
+    "3008": {
+      "width": 8,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3008"
+    },
+    "30080": {
+      "width": 4,
+      "height": 3.0,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 30080"
+    },
+    "30080b": {
+      "width": 4,
+      "height": 3.0,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 30080B"
+    },
+    "30081": {
+      "width": 2,
+      "height": 0.46,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 30081"
+    },
+    "30082": {
+      "width": 1,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 30082"
+    },
+    "30083": {
+      "width": 6,
+      "height": 5.0,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 30083"
+    },
+    "3009": {
+      "width": 6,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3009"
+    },
+    "30090": {
+      "width": 2,
+      "height": 1.03,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30090"
+    },
+    "30091": {
+      "width": 2,
+      "height": 1.52,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30091"
+    },
+    "30092": {
+      "width": 2,
+      "height": 2.83,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30092"
+    },
+    "30093": {
+      "width": 4,
+      "height": 4.67,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30093"
+    },
+    "30094": {
+      "width": 5,
+      "height": 0.5,
+      "depth": 5,
+      "kind": "plate",
+      "name": "LDraw 30094"
+    },
+    "3010": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3010"
+    },
+    "30100": {
+      "width": 6,
+      "height": 6.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 30100"
+    },
+    "30101": {
+      "width": 8,
+      "height": 6.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30101"
+    },
+    "30102": {
+      "width": 5,
+      "height": 5.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30102"
+    },
+    "301021": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 301021"
+    },
+    "30102p01": {
+      "width": 5,
+      "height": 5.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30102P01"
+    },
+    "3622": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3622"
+    },
+    "3622p01": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3622P01"
+    },
+    "3622p02": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3622P02"
+    },
+    "3622p03": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3622P03"
+    },
+    "3622p04": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3622P04"
+    },
+    "3622p05": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3622P05"
+    },
+    "3623": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3623"
+    },
+    "362321": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 362321"
+    },
+    "3623p05": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3623P05"
+    },
+    "3623pt1": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3623PT1"
+    },
+    "3623pt2": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3623PT2"
+    },
+    "6112596e": {
+      "width": 3,
+      "height": 0.01,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 6112596E"
+    },
+    "2352": {
+      "width": 4,
+      "height": 3.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 2352"
+    },
+    "2462": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 2462"
+    },
+    "3020": {
+      "width": 4,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 3020"
+    },
+    "30200": {
+      "width": 6,
+      "height": 3.5,
+      "depth": 6,
+      "kind": "brick",
+      "name": "LDraw 30200"
+    },
+    "302021": {
+      "width": 4,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 302021"
+    },
+    "302026": {
+      "width": 4,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 302026"
+    },
+    "30208": {
+      "width": 4,
+      "height": 1.64,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 30208"
+    },
+    "3021": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 3021"
+    },
+    "302101": {
+      "width": 3,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 302101"
+    },
+    "30211": {
+      "width": 1,
+      "height": 3.33,
+      "depth": 8,
+      "kind": "brick",
+      "name": "LDraw 30211"
+    },
+    "30213": {
+      "width": 2,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30213"
+    },
+    "30214": {
+      "width": 2,
+      "height": 1.57,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30214"
+    },
+    "3022": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 3022"
+    },
+    "302226": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 302226"
+    },
+    "30223": {
+      "width": 5,
+      "height": 7.5,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30223"
+    },
+    "30224": {
+      "width": 1,
+      "height": 2.32,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30224"
+    },
+    "3023": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3023"
+    },
+    "302323": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 302323"
+    },
+    "3024": {
+      "width": 1,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3024"
+    },
+    "30240": {
+      "width": 7,
+      "height": 0.6,
+      "depth": 6,
+      "kind": "plate",
+      "name": "LDraw 30240"
+    },
+    "302421": {
+      "width": 1,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 302421"
+    },
+    "30244": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 30244"
+    },
+    "3031": {
+      "width": 4,
+      "height": 0.5,
+      "depth": 4,
+      "kind": "plate",
+      "name": "LDraw 3031"
+    },
+    "3032": {
+      "width": 6,
+      "height": 0.5,
+      "depth": 4,
+      "kind": "plate",
+      "name": "LDraw 3032"
+    },
+    "30322": {
+      "width": 1,
+      "height": 8.0,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 30322"
+    },
+    "303223": {
+      "width": 6,
+      "height": 0.5,
+      "depth": 4,
+      "kind": "plate",
+      "name": "LDraw 303223"
+    },
+    "303226": {
+      "width": 6,
+      "height": 0.5,
+      "depth": 4,
+      "kind": "plate",
+      "name": "LDraw 303226"
+    },
+    "3034": {
+      "width": 8,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 3034"
+    },
+    "30340": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 3,
+      "kind": "plate",
+      "name": "LDraw 30340"
+    },
+    "30342": {
+      "width": 4,
+      "height": 1.89,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 30342"
+    },
+    "3035": {
+      "width": 8,
+      "height": 0.5,
+      "depth": 4,
+      "kind": "plate",
+      "name": "LDraw 3035"
+    },
+    "30350": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30350"
+    },
+    "30350a": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30350A"
+    },
+    "30350ad01": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30350AD01"
+    },
+    "30350b": {
+      "width": 2,
+      "height": 0.62,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30350B"
+    },
+    "30350c": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 30350C"
+    },
+    "3036": {
+      "width": 8,
+      "height": 0.5,
+      "depth": 6,
+      "kind": "plate",
+      "name": "LDraw 3036"
+    },
+    "30360": {
+      "width": 3,
+      "height": 2.83,
+      "depth": 6,
+      "kind": "brick",
+      "name": "LDraw 30360"
+    },
+    "30361": {
+      "width": 2,
+      "height": 2.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30361"
+    },
+    "30361a": {
+      "width": 2,
+      "height": 2.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30361A"
+    },
+    "30361aps1": {
+      "width": 2,
+      "height": 2.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30361APS1"
+    },
+    "30361aps2": {
+      "width": 2,
+      "height": 2.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30361APS2"
+    },
+    "3460": {
+      "width": 8,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3460"
+    },
+    "3666": {
+      "width": 6,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3666"
+    },
+    "3710": {
+      "width": 4,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3710"
+    },
+    "371026": {
+      "width": 4,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 371026"
+    },
+    "44772": {
+      "width": 7,
+      "height": 5.83,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 44772"
+    },
+    "3069": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3069"
+    },
+    "306901": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 306901"
+    },
+    "30699": {
+      "width": 5,
+      "height": 4.54,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30699"
+    },
+    "3069a": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3069A"
+    },
+    "3069b": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3069B"
+    },
+    "3069bd01": {
+      "width": 2,
+      "height": 0.34,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3069BD01"
+    },
+    "2412": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 2412"
+    },
+    "24120": {
+      "width": 4,
+      "height": 4.61,
+      "depth": 7,
+      "kind": "brick",
+      "name": "LDraw 24120"
+    },
+    "24122": {
+      "width": 2,
+      "height": 0.73,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 24122"
+    },
+    "2412a": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 2412A"
+    },
+    "2412b": {
+      "width": 2,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 2412B"
+    },
+    "2431": {
+      "width": 4,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 2431"
+    },
+    "243101": {
+      "width": 4,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 243101"
+    },
+    "24316": {
+      "width": 3,
+      "height": 0.67,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 24316"
+    },
+    "2431b": {
+      "width": 4,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 2431B"
+    },
+    "2431bp52": {
+      "width": 4,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 2431BP52"
+    },
+    "3070": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3070"
+    },
+    "307024": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 307024"
+    },
+    "3070a": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3070A"
+    },
+    "3070b": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3070B"
+    },
+    "3070bp00": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3070BP00"
+    },
+    "3070bp01": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 3070BP01"
+    },
+    "6636": {
+      "width": 6,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 6636"
+    },
+    "663626": {
+      "width": 6,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 663626"
+    },
+    "6636d50": {
+      "width": 6,
+      "height": 0.34,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 6636D50"
+    },
+    "6636dm0": {
+      "width": 6,
+      "height": 0.34,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 6636DM0"
+    },
+    "6636dm1": {
+      "width": 6,
+      "height": 0.34,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 6636DM1"
+    },
+    "6636p01": {
+      "width": 6,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 6636P01"
+    },
+    "3037": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3037"
+    },
+    "30370": {
+      "width": 2,
+      "height": 1.44,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30370"
+    },
+    "30370ps1": {
+      "width": 2,
+      "height": 1.44,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30370PS1"
+    },
+    "30370ps4": {
+      "width": 2,
+      "height": 1.44,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30370PS4"
+    },
+    "3038": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3038"
+    },
+    "30381": {
+      "width": 2,
+      "height": 1.8,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30381"
+    },
+    "30383": {
+      "width": 2,
+      "height": 0.81,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 30383"
+    },
+    "30384": {
+      "width": 4,
+      "height": 2.0,
+      "depth": 7,
+      "kind": "brick",
+      "name": "LDraw 30384"
+    },
+    "30385": {
+      "width": 1,
+      "height": 1.69,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30385"
+    },
+    "3039": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3039"
+    },
+    "30390": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 30390"
+    },
+    "30391": {
+      "width": 4,
+      "height": 3.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30391"
+    },
+    "303923": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 303923"
+    },
+    "303926": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 303926"
+    },
+    "30394": {
+      "width": 6,
+      "height": 3.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 30394"
+    },
+    "3040": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3040"
+    },
+    "30408": {
+      "width": 2,
+      "height": 1.62,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 30408"
+    },
+    "3041": {
+      "width": 4,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3041"
+    },
+    "30413": {
+      "width": 4,
+      "height": 1.0,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30413"
+    },
+    "30414": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30414"
+    },
+    "3041p01": {
+      "width": 4,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3041P01"
+    },
+    "3044": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3044"
+    },
+    "3044a": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3044A"
+    },
+    "3044b": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3044B"
+    },
+    "3044c": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3044C"
+    },
+    "3044p37": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3044P37"
+    },
+    "3298": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 3298"
+    },
+    "329826": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 329826"
+    },
+    "3298p01": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 3298P01"
+    },
+    "3298p04": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 3298P04"
+    },
+    "3298p10": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 3298P10"
+    },
+    "3298p11": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 3298P11"
+    },
+    "3665": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3665"
+    },
+    "3665p01": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3665P01"
+    },
+    "4286": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 4286"
+    },
+    "42862": {
+      "width": 3,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 42862"
+    },
+    "428621": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 428621"
+    },
+    "42865": {
+      "width": 2,
+      "height": 0.54,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 42865"
+    },
+    "85984": {
+      "width": 2,
+      "height": 0.65,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 85984"
+    },
+    "85984d01": {
+      "width": 2,
+      "height": 0.65,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 85984D01"
+    },
+    "85984d02": {
+      "width": 2,
+      "height": 0.65,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 85984D02"
+    },
+    "85984d50": {
+      "width": 2,
+      "height": 0.65,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 85984D50"
+    },
+    "85984p70": {
+      "width": 2,
+      "height": 0.65,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 85984P70"
+    },
+    "85984pc1": {
+      "width": 2,
+      "height": 0.65,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 85984PC1"
+    },
+    "11477": {
+      "width": 1,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 11477"
+    },
+    "11477pz0": {
+      "width": 1,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 11477PZ0"
+    },
+    "11477pz1": {
+      "width": 1,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 11477PZ1"
+    },
+    "11477pz2": {
+      "width": 1,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 11477PZ2"
+    },
+    "15068": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 15068"
+    },
+    "15068p01": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 15068P01"
+    },
+    "15068p02": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 15068P02"
+    },
+    "15068p03": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 15068P03"
+    },
+    "15068p04": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 15068P04"
+    },
+    "15068p05": {
+      "width": 2,
+      "height": 0.67,
+      "depth": 2,
+      "kind": "other",
+      "name": "LDraw 15068P05"
+    },
+    "50950": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 50950"
+    },
+    "61678": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 61678"
+    },
+    "61678d01": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 61678D01"
+    },
+    "61678d02": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 61678D02"
+    },
+    "61678p01": {
+      "width": 1,
+      "height": 1.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 61678P01"
+    },
+    "93606": {
+      "width": 2,
+      "height": 1.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 93606"
+    },
+    "93606p01": {
+      "width": 2,
+      "height": 1.0,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 93606P01"
+    },
+    "41766": {
+      "width": 2,
+      "height": 2.0,
+      "depth": 8,
+      "kind": "brick",
+      "name": "LDraw 41766"
+    },
+    "3062": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3062"
+    },
+    "3062-old": {
+      "width": 1,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3062-OLD"
+    },
+    "30622": {
+      "width": 2,
+      "height": 2.12,
+      "depth": 4,
+      "kind": "brick",
+      "name": "LDraw 30622"
+    },
+    "30624": {
+      "width": 3,
+      "height": 3.33,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 30624"
+    },
+    "30626": {
+      "width": 6,
+      "height": 3.43,
+      "depth": 3,
+      "kind": "brick",
+      "name": "LDraw 30626"
+    },
+    "3941": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3941"
+    },
+    "3941d01": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3941D01"
+    },
+    "3941p01": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 2,
+      "kind": "brick",
+      "name": "LDraw 3941P01"
+    },
+    "4032": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 4032"
+    },
+    "4032a": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 4032A"
+    },
+    "4032b": {
+      "width": 2,
+      "height": 0.5,
+      "depth": 2,
+      "kind": "plate",
+      "name": "LDraw 4032B"
+    },
+    "11213": {
+      "width": 6,
+      "height": 0.5,
+      "depth": 6,
+      "kind": "plate",
+      "name": "LDraw 11213"
+    },
+    "4073": {
+      "width": 1,
+      "height": 0.5,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 4073"
+    },
+    "20482": {
+      "width": 1,
+      "height": 0.67,
+      "depth": 1,
+      "kind": "other",
+      "name": "LDraw 20482"
+    },
+    "98138": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 98138"
+    },
+    "98138p01": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 98138P01"
+    },
+    "98138p02": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 98138P02"
+    },
+    "98138p03": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 98138P03"
+    },
+    "98138p04": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 98138P04"
+    },
+    "98138p05": {
+      "width": 1,
+      "height": 0.33,
+      "depth": 1,
+      "kind": "plate",
+      "name": "LDraw 98138P05"
+    },
+    "3700": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3700"
+    },
+    "3701": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3701"
+    },
+    "370101": {
+      "width": 4,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 370101"
+    },
+    "3702": {
+      "width": 8,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3702"
+    },
+    "370226": {
+      "width": 8,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 370226"
+    },
+    "3894": {
+      "width": 6,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 3894"
+    },
+    "32000": {
+      "width": 2,
+      "height": 1.17,
+      "depth": 1,
+      "kind": "brick",
+      "name": "LDraw 32000"
+    },
+    "32017": {
+      "width": 1,
+      "height": 0.42,
+      "depth": 5,
+      "kind": "plate",
+      "name": "LDraw 32017"
+    },
+    "32140": {
+      "width": 2,
+      "height": 0.83,
+      "depth": 4,
+      "kind": "other",
+      "name": "LDraw 32140"
+    },
+    "32523": {
+      "width": 1,
+      "height": 0.83,
+      "depth": 3,
+      "kind": "other",
+      "name": "LDraw 32523"
+    },
+    "32523p01": {
+      "width": 1,
+      "height": 0.83,
+      "depth": 3,
+      "kind": "other",
+      "name": "LDraw 32523P01"
+    },
+    "32524": {
+      "width": 1,
+      "height": 0.83,
+      "depth": 7,
+      "kind": "other",
+      "name": "LDraw 32524"
+    }
+  }
+}

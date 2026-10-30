@@ -211,7 +211,7 @@ class TestAssembly:
         ldraw = LDrawExporter.export(sample_assembly)
 
         assert "0 Name:" in ldraw
-        assert "1 4" in ldraw  # Red color code
+        assert "1 4 " in ldraw  # Bright Red = LDraw colour 4
         assert "3001.dat" in ldraw
 
     def test_json_serialization(self, sample_assembly, temp_output_dir):
