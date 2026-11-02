@@ -171,7 +171,8 @@ def build(output: Path, force: bool = False) -> None:
 
     docs = output / "docs"
     docs.mkdir(exist_ok=True)
-    for name in ("WEB3D_IMPLEMENTATION.md", "WEB3D_README.md", "DEPLOYMENT.md"):
+    for name in ("WEB3D_IMPLEMENTATION.md", "WEB3D_README.md", "DEPLOYMENT.md",
+                 "WEB3D_ACCEPTANCE.md"):
         source = ROOT / "docs" / name
         if source.is_file():
             (docs / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
