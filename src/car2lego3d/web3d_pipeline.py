@@ -299,7 +299,17 @@ try:
     from pydantic import BaseModel
 
     app = FastAPI(title="Web 3D LEGO Generator API", version="1.0.0")
-    pipeline = Web3DLegoPipeline()
+
+    # Built on first request, not at import: constructing it reads credentials,
+    # so an import-time instance makes this module unimportable without an API
+    # key, which breaks tests and any code that only wants the data classes.
+    _pipeline: "Web3DLegoPipeline | None" = None
+
+    def get_pipeline() -> "Web3DLegoPipeline":
+        global _pipeline
+        if _pipeline is None:
+            _pipeline = Web3DLegoPipeline()
+        return _pipeline
 
     class GenerationRequest(BaseModel):
         description: str
@@ -312,7 +322,7 @@ try:
     @app.post("/api/generate")
     async def generate_model(request: GenerationRequest):
         """Generate LEGO model from description"""
-        result = pipeline.generate_from_description(
+        result = get_pipeline().generate_from_description(
             description=request.description,
             category=request.category,
             style=request.style,
@@ -336,7 +346,7 @@ try:
     @app.get("/api/download/{format}/{filename}")
     async def download_file(format: str, filename: str):
         """Download generated file"""
-        filepath = pipeline.output_dir / filename
+        filepath = get_pipeline().output_dir / filename
         if not filepath.exists():
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(filepath)
