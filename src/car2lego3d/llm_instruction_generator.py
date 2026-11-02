@@ -105,15 +105,26 @@ class LLMInstructionGenerator:
         self.model = model
         self.catalogue = catalogue if catalogue is not None else load_catalogue()
         config = settings(model_key="CAR2LEGO_BLENDER_MODEL", default_model=model)
-        # A module plan for a four-figure-part vehicle takes minutes to produce;
-        # the OpenAI default timeout is far too short and surfaces as a bare
-        # "Connection error".
-        self.client = OpenAI(
-            api_key=config["api_key"],
-            base_url=config["base_url"],
-            timeout=600.0,
-            max_retries=2,
-        )
+        self.api_key = config["api_key"]
+        self.base_url = config["base_url"]
+        # The client is built on first use. Building it here raised at import
+        # time whenever no key was configured, which made the pipeline
+        # constructible only on a machine with credentials.
+        self._client = None
+
+    @property
+    def client(self):
+        """OpenAI client, created on first request."""
+        if self._client is None:
+            # A module plan for a four-figure-part vehicle takes minutes; the
+            # OpenAI default timeout surfaces as a bare "Connection error".
+            self._client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=600.0,
+                max_retries=2,
+            )
+        return self._client
 
     def available_parts(self, limit: int = 120) -> List[str]:
         """Real LDraw part IDs the model is allowed to place.
