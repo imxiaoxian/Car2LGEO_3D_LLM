@@ -230,38 +230,55 @@ def tile_layer(width: int, depth: int, spans, offset_x: int = 0, offset_z: int =
 class _Occupancy:
     """Rejects parts whose bounding boxes would intersect an accepted part.
 
-    A course-number comparison is not enough: a plate sits at y=0.2 but a brick
-    beside it spans 1.2 studs, so the two overlap while occupying different
-    courses. Cells are indexed on the stud grid and the actual y interval is
-    compared on lookup.
+    Course-number comparison is not enough: a plate at y=0.2 and a 1.2-stud
+    brick beside it overlap while occupying different courses. Rounding to
+    integer stud cells is also not enough: a scaled module has fractional
+    origins, so a part can straddle a cell boundary and slip through the grid
+    check while its real box still intersects its neighbour.
+
+    Boxes are bucketed on a coarse float grid and compared exactly on lookup.
     """
 
+    BUCKET = 4.0
+
     def __init__(self):
-        self._cells: dict[tuple[int, int], list[tuple[float, float]]] = {}
+        self._buckets: dict[tuple[int, int], list[tuple[float, ...]]] = {}
         self.dropped = 0
 
-    @staticmethod
-    def _cells_for(x: float, z: float, sx: int, sz: int):
-        start_x = int(round(x - sx / 2.0))
-        start_z = int(round(z - sz / 2.0))
-        for cx in range(start_x, start_x + sx):
-            for cz in range(start_z, start_z + sz):
-                yield cx, cz
+    @classmethod
+    def _box(cls, y, x, z, sx, sz, height):
+        return (x - sx / 2.0, x + sx / 2.0, y, y + height, z - sz / 2.0, z + sz / 2.0)
 
-    def covers(self, y: float, x: float, z: float, sx: int, sz: int,
-               height: float) -> bool:
-        lo, hi = y, y + height
-        for cell in self._cells_for(x, z, sx, sz):
-            for other_lo, other_hi in self._cells.get(cell, ()):
-                # Touching is fine; only real penetration counts.
-                if lo + 0.01 < other_hi and other_lo + 0.01 < hi:
+    @classmethod
+    def _buckets_for(cls, box, span: float = 0.5):
+        min_x, max_x, _, _, min_z, max_z = box
+        start_x = int((min_x - 0.001) // cls.BUCKET)
+        end_x = int((max_x + 0.001) // cls.BUCKET)
+        start_z = int((min_z - 0.001) // cls.BUCKET)
+        end_z = int((max_z + 0.001) // cls.BUCKET)
+        for bx in range(start_x, end_x + 1):
+            for bz in range(start_z, end_z + 1):
+                yield bx, bz
+
+    @staticmethod
+    def _intersects(a, b, epsilon: float = 0.01) -> bool:
+        # Touching is fine; only real penetration on every axis counts.
+        return (a[0] + epsilon < b[1] and b[0] + epsilon < a[1]
+                and a[2] + epsilon < b[3] and b[2] + epsilon < a[3]
+                and a[4] + epsilon < b[5] and b[4] + epsilon < a[5])
+
+    def covers(self, y, x, z, sx, sz, height) -> bool:
+        box = self._box(y, x, z, sx, sz, height)
+        for bucket in self._buckets_for(box):
+            for other in self._buckets.get(bucket, ()):
+                if self._intersects(box, other):
                     return True
         return False
 
-    def claim(self, y: float, x: float, z: float, sx: int, sz: int,
-              height: float) -> None:
-        for cell in self._cells_for(x, z, sx, sz):
-            self._cells.setdefault(cell, []).append((y, y + height))
+    def claim(self, y, x, z, sx, sz, height) -> None:
+        box = self._box(y, x, z, sx, sz, height)
+        for bucket in self._buckets_for(box):
+            self._buckets.setdefault(bucket, []).append(box)
 
 
 def _brick_for(part_id: str | None, kind: str, catalogue=None) -> LEGOBrick | None:
@@ -343,13 +360,65 @@ def expand_module(module: ModulePlan, catalogue=None, start_id: int = 0,
     return parts
 
 
-def expand_plan(plan: BuildPlan, catalogue=None, max_parts: int = 1500):
-    """Expand every module, respecting the overall part budget.
+def scale_plan(plan: BuildPlan, factor: float) -> BuildPlan:
+    """Return a copy of the plan grown or shrunk about the origin.
 
-    Returns ``(parts, spans)`` where ``spans`` maps each module name to the
-    ``(start, end)`` slice of ``parts`` it produced, so instruction steps line
-    up with what was actually built rather than with a re-computed estimate.
+    Part count tracks volume, so a plan landing at a third of the requested
+    budget needs its envelope scaled by the cube root of three. Doing this here
+    rather than in the prompt keeps the result predictable: the model's sense
+    of scale does not decide how large the build is.
     """
+    modules = [
+        ModulePlan(
+            name=module.name,
+            origin=tuple(v * factor for v in module.origin),
+            size=tuple(max(1, int(round(v * factor))) for v in module.size),
+            color=module.color,
+            fill=module.fill,
+            step=module.step,
+            accent_color=module.accent_color,
+        )
+        for module in plan.modules
+    ]
+    details = []
+    for detail in plan.details:
+        scaled = dict(detail)
+        scaled["position"] = [v * factor for v in detail["position"]]
+        details.append(scaled)
+    return BuildPlan(name=plan.name, modules=modules, notes=plan.notes,
+                     details=details)
+
+
+def expand_plan(plan: BuildPlan, catalogue=None, max_parts: int = 1500,
+                target_ratio: float = 0.75, attempts: int = 3):
+    """Expand every module, growing the plan until it fills the budget.
+
+    The model decides proportions and structure; this decides physical size. A
+    car plan returned at 10 x 6 x 24 studs would only ever reach a few hundred
+    parts, so the envelope is scaled until the count approaches the budget.
+    Returns ``(parts, spans)`` where spans maps module name to its
+    ``(start, end)`` slice so instruction steps match what was built.
+    """
+    parts, spans = _expand_once(plan, catalogue, max_parts)
+    if not plan.modules:
+        return parts, spans
+
+    for _ in range(attempts):
+        if len(parts) >= max_parts * target_ratio:
+            break
+        factor = (max_parts * target_ratio / max(len(parts), 1)) ** (1 / 3)
+        # Cap growth so an undersized plan cannot balloon into a shape nothing
+        # like what was asked for.
+        factor = min(factor, 3.0)
+        if factor <= 1.05:
+            break
+        plan = scale_plan(plan, factor)
+        parts, spans = _expand_once(plan, catalogue, max_parts)
+    return parts, spans
+
+
+def _expand_once(plan: BuildPlan, catalogue, max_parts: int):
+    """Expand modules and then details, returning parts and their spans."""
     parts: list[PlacedPart] = []
     spans: list[tuple[str, int, int]] = []
     occupied = _Occupancy()
