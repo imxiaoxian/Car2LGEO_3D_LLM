@@ -166,13 +166,16 @@ class TestPartVariety:
                   if p.brick_definition.category.value == "brick"]
         assert bricks, "one-stud module produced no bricks"
 
-    def test_details_appended_after_modules(self, catalogue):
+    def test_details_are_placed_before_bodywork(self, catalogue):
+        # Details claim their space first, so the tiler builds around a wheel
+        # instead of the wheel being rejected as a collision.
         plan = BuildPlan("car", [ModulePlan("body", (0, 0, 0), (6, 2, 8), "Black")],
                          details=[{"part": "3823", "position": [2, 1, 2],
                                    "rotation": [0, 0, 0], "color": "Trans-Clear"}])
         parts, spans = expand_plan(plan, catalogue, max_parts=500)
-        assert spans[-1][0] == "details"
-        assert parts[-1].brick_definition.lego_id == "3823"
+        assert spans[0][0] == "details"
+        assert parts[0].brick_definition.lego_id == "3823"
+        assert "3823" in {p.brick_definition.lego_id for p in parts}
 
     def test_unknown_detail_is_skipped(self, catalogue):
         plan = BuildPlan("car", [ModulePlan("body", (0, 0, 0), (4, 2, 4), "Black")],

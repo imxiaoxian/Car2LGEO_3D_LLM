@@ -250,6 +250,12 @@ tile them into real parts.
     {"name": "body", "origin": [0, 2.4, 0], "size": [8, 4, 16],
      "color": "Bright Red", "fill": "solid", "accent_color": "Black", "step": 2}
   ],
+  "details": [
+    {"part": "55982", "position": [0, 2, 4], "rotation": [0, 0, 0],
+     "color": "Black", "purpose": "front left wheel"},
+    {"part": "3069b", "position": [4, 5, 8], "rotation": [0, 0, 0],
+     "color": "Trans-Clear", "purpose": "windscreen"}
+  ],
   "notes": "assembly order and intent"
 }
 
@@ -257,6 +263,17 @@ tile them into real parts.
 - `size` is [width, height, depth] in studs.
 - `fill`: "solid" (bricks with plate courses), "shell" or "plate-only".
 - Modules must not overlap; stack them by adding the lower module's height.
+- `details` are individual parts the tiler cannot produce by filling a box:
+  wheels, tyres, rims, windscreens and other glazing. Tiling only makes
+  rectangular bodywork, so a vehicle without `details` has no wheels and a
+  car without a windscreen reads as a brick. Place them at the position the
+  feature belongs (wheel centres at the chassis corners, glass in the cabin
+  openings).
+
+**Vehicle wheels are required.** Every vehicle needs four wheel assemblies
+from the allowed list — a tyre plus a rim, or a combined wheel part — placed at
+the four corners of the chassis. Sites use part numbers such as 55982, 56145,
+44309, 41897, 30028, 6578, 6014, 6015 and 4624.
 
 ### Part mode (only for very small models)
 {

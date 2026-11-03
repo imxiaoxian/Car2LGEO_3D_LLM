@@ -418,10 +418,55 @@ def expand_plan(plan: BuildPlan, catalogue=None, max_parts: int = 1500,
 
 
 def _expand_once(plan: BuildPlan, catalogue, max_parts: int):
-    """Expand modules and then details, returning parts and their spans."""
+    """Expand details and modules, returning parts and their spans.
+
+    Details are placed first so they claim their space: a wheel sits where the
+    body would otherwise tile, and reserving it means the tiler builds around
+    the wheel instead of the wheel being dropped as a collision.
+    """
     parts: list[PlacedPart] = []
     spans: list[tuple[str, int, int]] = []
     occupied = _Occupancy()
+
+    # Specialised pieces first: wheels and glazing are what make a model
+    # readable, and tiling only produces rectangular bodywork.
+    if plan.details and len(parts) < max_parts:
+        start = len(parts)
+        for detail in plan.details:
+            if len(parts) >= max_parts:
+                break
+            requested = detail["part"]
+            if catalogue is not None:
+                if not catalogue.has(requested):
+                    resolved = catalogue.resolve(requested)
+                    if not resolved:
+                        continue
+                    requested = resolved
+            brick = (BrickLibrary.resolve_brick(requested, catalogue)
+                     if requested else None)
+            if brick is None:
+                continue
+            position = Vector3.from_list(detail["position"])
+            # Two details may also collide with each other.
+            height = max(brick.dimensions.y, 0.4)
+            if occupied.covers(position.y, position.x, position.z,
+                               max(1, int(round(brick.dimensions.x))),
+                               max(1, int(round(brick.dimensions.z))), height):
+                occupied.dropped += 1
+                continue
+            occupied.claim(position.y, position.x, position.z,
+                           max(1, int(round(brick.dimensions.x))),
+                           max(1, int(round(brick.dimensions.z))), height)
+            parts.append(PlacedPart(
+                instance_id=len(parts),
+                brick_definition=brick,
+                position=position,
+                rotation=Vector3.from_list(detail["rotation"]),
+                color=detail["color"],
+            ))
+        if len(parts) > start:
+            spans.append(("details", start, len(parts)))
+
     for module in plan.modules:
         if len(parts) >= max_parts:
             break
@@ -451,10 +496,23 @@ def _expand_once(plan: BuildPlan, catalogue, max_parts: int):
                      if requested else None)
             if brick is None:
                 continue
+            position = Vector3.from_list(detail["position"])
+            # Details must clear the bodywork too. A wheel placed where a module
+            # already tiled is a real collision, so it is dropped rather than
+            # appended and left to fail validation.
+            height = max(brick.dimensions.y, 0.4)
+            if occupied.covers(position.y, position.x, position.z,
+                               max(1, int(round(brick.dimensions.x))),
+                               max(1, int(round(brick.dimensions.z))), height):
+                occupied.dropped += 1
+                continue
+            occupied.claim(position.y, position.x, position.z,
+                           max(1, int(round(brick.dimensions.x))),
+                           max(1, int(round(brick.dimensions.z))), height)
             parts.append(PlacedPart(
                 instance_id=len(parts),
                 brick_definition=brick,
-                position=Vector3.from_list(detail["position"]),
+                position=position,
                 rotation=Vector3.from_list(detail["rotation"]),
                 color=detail["color"],
             ))

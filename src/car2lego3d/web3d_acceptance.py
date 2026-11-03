@@ -50,6 +50,15 @@ CASES = [
 ]
 
 
+# Wheel and tyre parts that identify a buildable vehicle. A car without wheels
+# is a decorated box: tiling only produces rectangular bodywork, so wheels have
+# to come from the plan's explicit details.
+WHEEL_PARTS = {
+    "55982", "56145", "44309", "41897", "30028", "6578", "6014", "6015",
+    "4624", "18976", "11209", "30391", "93594", "93593",
+}
+
+
 def evaluate(parts, params) -> dict:
     """Score one generated model against the acceptance criteria."""
     summary = describe(parts)
@@ -62,12 +71,16 @@ def evaluate(parts, params) -> dict:
         "enough_part_types": len(unique) >= BENCHMARK["min_unique_types"],
         "enough_colors": len(colors) >= BENCHMARK["min_colors"],
     }
+    wheels = unique & WHEEL_PARTS
+    if params.category == ModelCategory.VEHICLE:
+        checks["has_wheels"] = len(wheels) >= 1
     return {
         "summary": summary,
         "checks": checks,
         "passed": all(checks.values()),
         "unique_types": len(unique),
         "colors_used": sorted(colors),
+        "wheels": sorted(wheels),
     }
 
 

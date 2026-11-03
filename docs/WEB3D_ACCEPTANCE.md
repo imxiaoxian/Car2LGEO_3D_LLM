@@ -29,44 +29,55 @@ Acceptance thresholds used by `web3d_acceptance.py`:
 
 ## Result
 
-**All three cases pass.** The sports car and pickup are the cases that matter
-most here, since the benchmark is a set of vehicles:
+**All three cases pass, and both vehicles now carry wheels.**
 
 | Metric | Sports car | Pickup truck | Town house | Benchmark |
 |---|---|---|---|---|
-| Parts | 1774 | 1502 | 3000 | 1127–4122 |
-| Unique part types | 51 | 56 | 59 | 207–524 |
+| Parts | 1478 | 1192 | 3000 | 1127–4122 |
+| Unique part types | 98 | 57 | 68 | 207–524 |
 | Colours | 5 | 5 | 6 | 12–21 |
 | Structural score | 1.0 | 1.0 | 1.0 | — |
 | Overlap errors | 0 | 0 | 0 | — |
-| Instruction steps | 32 | 33 | 53 | — |
-| Generation time | 149 s | 100 s | 377 s | — |
-| Tokens | 11852 | 11248 | 14130 | — |
+| Instruction steps | 24 | 41 | 39 | — |
+| Generation time | 104 s | 164 s | 468 s | — |
+| Tokens | 11493 | 12689 | 15593 | — |
 
 Commands:
 
 ```
-python -m car2lego3d.web3d_acceptance --output runs/acc14 --case sports-car
-python -m car2lego3d.web3d_acceptance --output runs/acc15 --case pickup-truck
-python -m car2lego3d.web3d_acceptance --output runs/acc10 --case town-house
+python -m car2lego3d.web3d_acceptance --output runs/acc16 --case sports-car
+python -m car2lego3d.web3d_acceptance --output runs/acc17 --case pickup-truck
+python -m car2lego3d.web3d_acceptance --output runs/acc18 --case town-house
 ```
 
-Records: `runs/acc14/sports-car/`, `runs/acc15/pickup-truck/` and
-`runs/acc10/town-house/`, each holding `report.json`, `assembly.json` and
+Records: `runs/acc16/sports-car/`, `runs/acc17/pickup-truck/` and
+`runs/acc18/town-house/`, each holding `report.json`, `assembly.json` and
 `model.ldr`.
 
-The sports car came out at 28 x 14 x 67 studs. The Lamborghini Countach in the
+The sports car came out at 38 x 14 x 70 studs. The Lamborghini Countach in the
 reference set is 20 x 12 x 42 studs at 1512 parts, so the generated envelope is
 in the right range rather than merely numerically similar.
+
+### Wheels and glazing
+
+Tiling only produces rectangular bodywork, so a filled box has no wheels and no
+windscreen — earlier runs passed every numeric check while being a decorated
+brick. The plan now carries an explicit `details` list for parts the tiler
+cannot make, and vehicles are checked for at least one wheel or tyre part.
+
+Details are placed **before** the bodywork claims space, so the tiler builds
+around a wheel rather than the wheel being rejected as a collision. That
+ordering was a real defect: placed last, every wheel inside the body volume was
+dropped and the model still reported a clean structural score.
 
 ## Not verified
 
 These are open, not passed:
 
-- **Part variety is well below the reference.** 51–59 types against 207–524.
-  The expander tiles boxes with structural bricks and plates; the reference
-  models also use slopes, wedges, Technic links and curved panels to shape a
-  car body that no box tiling reproduces. Scale is matched; sculpted form is
+- **Part variety is below the reference.** 57–98 types against 207–524. The
+  expander tiles boxes with structural bricks and plates; the reference models
+  also use slopes, wedges, Technic links and curved panels to shape a car body
+  that no box tiling reproduces. Scale and wheels are matched; sculpted form is
   not. This is the largest remaining gap.
 - **No collision check against real LDraw geometry.** Overlap is checked with
   stud-grid bounding boxes, so two parts that do not interpenetrate on the grid
@@ -88,6 +99,8 @@ Each of these was caught by a real run, not by review:
 | 145 parts for a car body | tiling preferred the largest footprint, and the measured set included 6x6 domes and 12-stud columns as "bricks" | restricted tiling to structural parts (≤8 stud² area, ≤1.6 stud height) |
 | 98 parts and **structural score 0.0** | a plate at y=0.2 and a 1.2-stud brick overlap vertically while their course numbers differ | occupancy now tests real y intervals per stud cell and drops a piece that would clash |
 | 122 parts for a two-storey house | the prompt never said how much volume the part budget fills | the prompt now states the target envelope in studs |
+| Vehicles passed every check but had **no wheels** | tiling only makes rectangular bodywork, and the plan had no way to place a wheel; the checks never looked for one | the plan carries a `details` list, vehicles must place four wheels, and acceptance fails a vehicle without any wheel part |
+| A wheel placed inside the body was dropped | details were appended after tiling, so the wheel collided with bodywork and was rejected | details are placed first and claim their space, so the tiler builds around them |
 
 ## Reproducing
 
